@@ -1,0 +1,143 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  docker-compose.yml — Enterprise Agentic AI L1 Support Automation Platform
+#
+#  Services:
+#    api      — FastAPI backend (Uvicorn)
+#    worker   — Celery background worker (same image, different CMD)
+#    redis    — Message broker + Celery result backend
+#    dashboard — React admin dashboard (served by Nginx)
+#
+#  Supabase is external (hosted) — connection via DATABASE_URL env var.
+#  No local Postgres container needed.
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+
+  # ── FastAPI backend ──────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: l1_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - l1_network
+    volumes:
+      # Mount source in dev mode for hot-reload (comment out for production)
+      - ./backend/app:/app/app:ro
+
+  # ── Celery worker ─────────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: l1_worker
+    restart: unless-stopped
+    # Override CMD to start Celery instead of Uvicorn
+    command: >
+      celery -A app.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      --queues=ticket_pipeline,escalation,audit
+    env_file:
+      - ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - l1_network
+    volumes:
+      - ./backend/app:/app/app:ro
+
+  # ── Celery beat scheduler (periodic polling fallback) ─────────────────────────
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: l1_beat
+    restart: unless-stopped
+    command: >
+      celery -A app.celery_app beat
+      --loglevel=info
+      --scheduler celery.schedulers:PersistentScheduler
+    env_file:
+      - ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - l1_network
+
+  # ── Redis (broker + result backend) ──────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: l1_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - l1_network
+    volumes:
+      - redis_data:/data
+
+  # ── React Dashboard (Nginx) ────────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: l1_dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - l1_network
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+
+# ── Named volumes ─────────────────────────────────────────────────────────────
+volumes:
+  redis_data:
+    driver: local
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  l1_network:
+    driver: bridge

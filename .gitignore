@@ -1,0 +1,48 @@
+# ── Secrets / credentials (never commit) ─────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.*.local
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+.Python
+
+# ── Logs (runtime-generated; directory created by app at startup) ─────────────
+logs/
+*.log
+
+# ── Celery ────────────────────────────────────────────────────────────────────
+celerybeat-schedule
+celerybeat.pid
+
+# ── Node.js / dashboard ───────────────────────────────────────────────────────
+node_modules/
+dashboard/dist/
+dashboard/.env
+
+# ── Large binaries ────────────────────────────────────────────────────────────
+*.exe
+*.bin
+*.dmg
+*.pkg
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
