@@ -112,13 +112,14 @@ def create_jira_ticket() -> str:
     auth = (settings.jira_email, settings.jira_api_token)
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
 
-    summary = "My screen keeps flickering — not sure what category this falls under"
+    summary = "Not sure who to contact — general IT help needed with my workstation setup"
     description = (
-        "Hi, my monitor has been randomly flickering for the past couple of days. "
-        "It happens both in meetings and when I'm just working in Excel. "
-        "I'm not sure if this is a display driver issue, a cable problem, or something else. "
-        "Not sure which team to contact — can someone point me in the right direction "
-        "or send me some troubleshooting steps?"
+        "Hi, I have a few general IT questions about my workstation and I'm not sure "
+        "which team to contact or what the right process is. "
+        "I'm having some random issues with my computer and honestly not sure if this "
+        "falls under IT helpdesk, desktop support, or somewhere else. "
+        "Could someone send me some guidance on who handles general IT queries "
+        "and what the standard process is for getting help?"
     )
 
     body = {
@@ -151,13 +152,14 @@ def ingest_ticket(issue_key: str) -> str:
     normalized = {
         "source":         "jira",
         "external_id":    issue_key,
-        "summary":        "My screen keeps flickering — not sure what category this falls under",
+        "summary":        "Not sure who to contact — general IT help needed with my workstation setup",
         "description": (
-            "Hi, my monitor has been randomly flickering for the past couple of days. "
-            "It happens both in meetings and when I'm just working in Excel. "
-            "I'm not sure if this is a display driver issue, a cable problem, or something else. "
-            "Not sure which team to contact — can someone point me in the right direction "
-            "or send me some troubleshooting steps?"
+            "Hi, I have a few general IT questions about my workstation and I'm not sure "
+            "which team to contact or what the right process is. "
+            "I'm having some random issues with my computer and honestly not sure if this "
+            "falls under IT helpdesk, desktop support, or somewhere else. "
+            "Could someone send me some guidance on who handles general IT queries "
+            "and what the standard process is for getting help?"
         ),
         "status":         "open",
         "priority":       "medium",
