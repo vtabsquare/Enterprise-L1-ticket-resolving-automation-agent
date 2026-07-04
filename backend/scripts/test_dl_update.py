@@ -86,7 +86,7 @@ from app.orchestrator import Orchestrator
 log = structlog.get_logger(__name__)
 
 # ── Target addresses ───────────────────────────────────────────────────────────
-TARGET_USER_EMAIL = "test.user@vtabsquare.com"
+TARGET_USER_EMAIL = "l1bot.test@vtabsquare.com"
 TARGET_LIST_EMAIL = "l1testdl@vtabsquare.com"
 
 
