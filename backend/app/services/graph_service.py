@@ -36,6 +36,17 @@ def _check_response(resp: requests.Response, context: str) -> None:
     resp.raise_for_status()
 
 
+def _is_already_member_error(resp: requests.Response) -> bool:
+    """Return True when Graph signals the user is already in the group (idempotent)."""
+    if resp.status_code != 400:
+        return False
+    try:
+        msg = resp.json().get("error", {}).get("message", "")
+        return "already exist" in msg.lower()
+    except Exception:
+        return False
+
+
 class GraphService:
     """
     Wrapper for Microsoft Graph API v1.0 and LDAP.
@@ -146,6 +157,9 @@ class GraphService:
         }
         
         response = requests.post(url, headers=self._get_headers(), json=payload)
+        if _is_already_member_error(response):
+            log.info("GraphService.add_to_group: user already a member (idempotent)", upn=user_principal_name, group_id=group_id)
+            return True
         _check_response(response, "add_to_group")
         return True
 
@@ -180,6 +194,9 @@ class GraphService:
         }
         
         add_resp = requests.post(add_url, headers=headers, json=payload)
+        if _is_already_member_error(add_resp):
+            log.info("GraphService.add_to_distribution_list: user already a member (idempotent)", upn=user_principal_name, list_email=list_email)
+            return True
         _check_response(add_resp, "add_to_distribution_list/members_ref")
         return True
 
