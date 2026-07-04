@@ -251,6 +251,13 @@ class GraphService:
         
         response = requests.post(url, headers=self._get_headers(), json=payload)
         _check_response(response, "send_email")
+        log.info(
+            "GraphService.send_email: sent",
+            to=to,
+            subject=subject,
+            sender=sender,
+            status_code=response.status_code,
+        )
         return True
 
     def health_check(self) -> bool:
