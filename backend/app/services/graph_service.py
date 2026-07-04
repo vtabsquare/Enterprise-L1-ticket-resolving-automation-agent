@@ -37,12 +37,21 @@ def _check_response(resp: requests.Response, context: str) -> None:
 
 
 def _is_already_member_error(resp: requests.Response) -> bool:
-    """Return True when Graph signals the user is already in the group (idempotent)."""
+    """Return True when Graph signals the user is already in the group (idempotent).
+
+    Matches the specific OData message:
+      'One or more added object references already exist for the
+       following modified properties: \'members\'.'
+
+    Requires BOTH 'already exist' AND 'members' so that unrelated 400
+    errors (e.g. group-type restriction, missing field) are never
+    silently swallowed as a harmless no-op.
+    """
     if resp.status_code != 400:
         return False
     try:
-        msg = resp.json().get("error", {}).get("message", "")
-        return "already exist" in msg.lower()
+        msg = resp.json().get("error", {}).get("message", "").lower()
+        return "already exist" in msg and "members" in msg
     except Exception:
         return False
 
@@ -198,6 +207,13 @@ class GraphService:
             log.info("GraphService.add_to_distribution_list: user already a member (idempotent)", upn=user_principal_name, list_email=list_email)
             return True
         _check_response(add_resp, "add_to_distribution_list/members_ref")
+        log.info(
+            "GraphService.add_to_distribution_list: member added",
+            upn=user_principal_name,
+            list_email=list_email,
+            group_id=group_id,
+            status_code=add_resp.status_code,
+        )
         return True
 
     def send_email(self, to: str, subject: str, body: str) -> bool:
