@@ -24,6 +24,18 @@ from app.config import get_settings
 log = structlog.get_logger(__name__)
 
 
+def _check_response(resp: requests.Response, context: str) -> None:
+    """Log Graph API error body before raising so every failure is observable."""
+    if not resp.ok:
+        log.warning(
+            "Graph API error response",
+            context=context,
+            status_code=resp.status_code,
+            body=resp.text,
+        )
+    resp.raise_for_status()
+
+
 class GraphService:
     """
     Wrapper for Microsoft Graph API v1.0 and LDAP.
@@ -93,7 +105,7 @@ class GraphService:
         payload = {"accountEnabled": True}
         
         response = requests.patch(url, headers=self._get_headers(), json=payload)
-        response.raise_for_status()
+        _check_response(response, "unlock_account")
         return True
 
     def reset_password(self, user_principal_name: str, temporary_password: str) -> bool:
@@ -115,7 +127,7 @@ class GraphService:
         }
         
         response = requests.patch(url, headers=self._get_headers(), json=payload)
-        response.raise_for_status()
+        _check_response(response, "reset_password")
         return True
 
     def add_to_group(self, user_principal_name: str, group_id: str) -> bool:
@@ -134,7 +146,7 @@ class GraphService:
         }
         
         response = requests.post(url, headers=self._get_headers(), json=payload)
-        response.raise_for_status()
+        _check_response(response, "add_to_group")
         return True
 
     def add_to_distribution_list(self, user_principal_name: str, list_email: str) -> bool:
@@ -153,7 +165,7 @@ class GraphService:
         # 1. Resolve list email to group ID
         search_url = f"https://graph.microsoft.com/v1.0/groups?$filter=mail eq '{list_email}'"
         search_resp = requests.get(search_url, headers=headers)
-        search_resp.raise_for_status()
+        _check_response(search_resp, "add_to_distribution_list/group_search")
         
         data = search_resp.json()
         if not data.get("value"):
@@ -168,7 +180,7 @@ class GraphService:
         }
         
         add_resp = requests.post(add_url, headers=headers, json=payload)
-        add_resp.raise_for_status()
+        _check_response(add_resp, "add_to_distribution_list/members_ref")
         return True
 
     def send_email(self, to: str, subject: str, body: str) -> bool:
@@ -205,7 +217,7 @@ class GraphService:
         }
         
         response = requests.post(url, headers=self._get_headers(), json=payload)
-        response.raise_for_status()
+        _check_response(response, "send_email")
         return True
 
     def health_check(self) -> bool:
