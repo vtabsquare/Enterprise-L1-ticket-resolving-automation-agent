@@ -9,9 +9,13 @@ Responsibilities:
   - Configure structured logging
 """
 
-import structlog
+import sys
 import logging
+import logging.handlers
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+import structlog
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,19 +28,75 @@ from app.routers import webhook_router, ticket_router, admin_router, dashboard_r
 # ── Structured logging setup ──────────────────────────────────────────────────
 
 def configure_logging(log_level: str = "INFO") -> None:
-    structlog.configure(
+    """
+    Configure structlog to write simultaneously to:
+      - stdout        (ConsoleRenderer in dev, JSONRenderer in prod)
+      - logs/app.log  (RotatingFileHandler, always JSON, 10 MB x 5 backups)
+
+    Uses the structlog stdlib integration so that both stdlib loggers
+    (uvicorn, httpx, msal, etc.) and native structlog loggers are routed
+    through both sinks.  Every log line in the file is a self-contained JSON
+    object — grep-friendly and unambiguous.
+    """
+    level = getattr(logging, log_level.upper(), logging.INFO)
+    settings = get_settings()
+
+    log_file = Path(__file__).resolve().parent.parent / "logs" / "app.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Processors run on every log event before the renderer ─────────────────
+    shared_pre_chain: list = [
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+    ]
+
+    # stdout handler ─────────────────────────────────────────────────────────
+    console_formatter = structlog.stdlib.ProcessorFormatter(
         processors=[
-            structlog.contextvars.merge_contextvars,
-            structlog.processors.add_log_level,
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.dev.ConsoleRenderer() if get_settings().is_development
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.dev.ConsoleRenderer() if settings.is_development
             else structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, log_level.upper(), logging.INFO)
-        ),
-        context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(),
+        foreign_pre_chain=shared_pre_chain,
+    )
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(console_formatter)
+
+    # rotating file handler (always JSON for grep/analysis) ──────────────────
+    file_formatter = structlog.stdlib.ProcessorFormatter(
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.processors.JSONRenderer(),
+        ],
+        foreign_pre_chain=shared_pre_chain,
+    )
+    file_handler = logging.handlers.RotatingFileHandler(
+        str(log_file),
+        maxBytes=10 * 1024 * 1024,  # 10 MB per file
+        backupCount=5,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(file_formatter)
+
+    # Root stdlib logger receives both handlers ───────────────────────────────
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.addHandler(stream_handler)
+    root_logger.addHandler(file_handler)
+    root_logger.setLevel(level)
+
+    # structlog global configuration ──────────────────────────────────────────
+    structlog.configure(
+        processors=shared_pre_chain + [
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
     )
 
 
