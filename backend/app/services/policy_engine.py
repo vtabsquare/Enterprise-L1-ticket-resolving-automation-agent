@@ -121,7 +121,7 @@ def evaluate(
 
     def _escalate(reason: str, policy_id: str | None = None) -> PolicyDecision:
         target = _get_escalation_target(ticket)
-        log.info("PolicyEngine → ESCALATED", reason=reason, ticket_id=ticket_id)
+        log.info("PolicyEngine -> ESCALATED", reason=reason, ticket_id=ticket_id)
         _write_audit(ticket_id, action_plan, "escalated", reason)
         return PolicyDecision(
             outcome=PolicyOutcome.ESCALATED,
@@ -132,7 +132,7 @@ def evaluate(
         )
 
     def _block(reason: str) -> PolicyDecision:
-        log.info("PolicyEngine → BLOCKED", reason=reason, ticket_id=ticket_id)
+        log.info("PolicyEngine -> BLOCKED", reason=reason, ticket_id=ticket_id)
         _write_audit(ticket_id, action_plan, "blocked", reason)
         return PolicyDecision(
             outcome=PolicyOutcome.BLOCKED,
@@ -143,7 +143,7 @@ def evaluate(
 
     def _approve(policy_id: str) -> PolicyDecision:
         reason = "All policy checks passed."
-        log.info("PolicyEngine → APPROVED", ticket_id=ticket_id, action_type=action_plan.action_type)
+        log.info("PolicyEngine -> APPROVED", ticket_id=ticket_id, action_type=action_plan.action_type)
         _write_audit(ticket_id, action_plan, "approved", reason)
         return PolicyDecision(
             outcome=PolicyOutcome.APPROVED,
