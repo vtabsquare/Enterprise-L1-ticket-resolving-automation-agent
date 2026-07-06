@@ -69,10 +69,12 @@ class EscalationAgent:
 
         try:
             # Record escalation in the escalations table (for Phase 6 dashboard)
+            from datetime import datetime, timezone
             supabase_service.get_supabase_client().table("escalations").insert({
                 "ticket_id": ticket_id,
                 "reason": reason,
-                "escalated_to": escalation_target
+                "escalated_to": escalation_target,
+                "notified_at": datetime.now(timezone.utc).isoformat()
             }).execute()
 
             # Record action in local DB
