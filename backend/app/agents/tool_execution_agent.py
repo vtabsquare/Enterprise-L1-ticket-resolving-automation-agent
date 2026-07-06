@@ -99,16 +99,34 @@ class ToolExecutionAgent:
 
         retries = 0
         success = False
+        noop = False          # True when ad_unlock found account already enabled
         message = ""
         raw_response = None
         
         # Execution loop (1 initial attempt + 1 retry = 2 max attempts)
         for attempt in range(2):
             try:
-                # Stub out response logging from mock GraphService
-                _attempt()
+                result_data = _attempt()
+
+                # ad_unlock returns a dict — inspect it to distinguish real vs no-op
+                if action_plan.action_type == "ad_unlock" and isinstance(result_data, dict):
+                    if result_data.get("changed") is False:
+                        noop = True
+                        message = (
+                            f"ad_unlock: no-op — account '{action_plan.parameters.get('user_email')}' "
+                            f"was already enabled; no write performed"
+                        )
+                        raw_response = result_data
+                    else:
+                        message = (
+                            f"ad_unlock: account successfully re-enabled — "
+                            f"{result_data.get('note', '')}"
+                        )
+                        raw_response = result_data
+                else:
+                    message = f"Successfully executed '{action_plan.action_type}'"
+
                 success = True
-                message = f"Successfully executed '{action_plan.action_type}'"
                 break
                 
             except Exception as e:
@@ -134,17 +152,23 @@ class ToolExecutionAgent:
             retries_attempted=retries
         )
 
-        # Log agent action
+        # agent_action: noop gets its own status so the DB is unambiguous
+        action_status = "noop" if noop else ("success" if success else "failed")
         supabase_service.insert_agent_action({
             "ticket_id": ticket_id,
             "agent_name": "ToolExecutionAgent",
             "action_type": "tool_execute",
             "result": result.model_dump(),
-            "status": "success" if success else "failed",
+            "status": action_status,
         })
 
-        # Log Immutable Audit
-        event_type = "tool_execution_success" if success else "tool_execution_failed"
+        # audit event: three distinct values
+        if noop:
+            event_type = "tool_execution_noop"
+        elif success:
+            event_type = "tool_execution_success"
+        else:
+            event_type = "tool_execution_failed"
         AuditAgent.log(
             ticket_id=ticket_id,
             agent_name="ToolExecutionAgent",

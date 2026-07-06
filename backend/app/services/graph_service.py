@@ -111,22 +111,74 @@ class GraphService:
             "Content-Type": "application/json"
         }
 
-    def unlock_account(self, user_principal_name: str) -> bool:
+    def unlock_account(self, user_principal_name: str) -> dict:
         """
-        Unlock a user's AD account via Graph API.
-        PATCH /users/{upn} { accountEnabled: true }
+        Unlock a user's AD account via Graph API — state-aware.
+
+        Flow:
+          1. GET current accountEnabled value.
+          2. If already True  -> log as explicit no-op; return {"changed": False, ...}
+          3. If False         -> PATCH accountEnabled=True, re-read to confirm,
+                               return {"changed": True, ...}
+
+        Returns a dict (not a bare bool) so callers can distinguish a real
+        re-enablement from an idempotent no-op.
         """
         if self._is_mock:
             log.info("GraphService.unlock_account (MOCK)", upn=user_principal_name)
-            return True
-            
-        log.info("GraphService.unlock_account (REAL)", upn=user_principal_name)
+            return {"changed": True, "was_enabled": False, "now_enabled": True, "note": "mock"}
+
+        log.info("GraphService.unlock_account: reading current state", upn=user_principal_name)
         url = f"https://graph.microsoft.com/v1.0/users/{user_principal_name}"
-        payload = {"accountEnabled": True}
-        
-        response = requests.patch(url, headers=self._get_headers(), json=payload)
-        _check_response(response, "unlock_account")
-        return True
+        headers = self._get_headers()
+
+        # Step 1: read current accountEnabled
+        get_resp = requests.get(url, headers=headers, params={"$select": "accountEnabled"})
+        _check_response(get_resp, "unlock_account/get_current_state")
+        current_enabled = get_resp.json().get("accountEnabled")
+
+        # Step 2: no-op path — account is already enabled, do not write
+        if current_enabled is True:
+            log.warning(
+                "GraphService.unlock_account: no-op — account was not disabled",
+                upn=user_principal_name,
+                accountEnabled=current_enabled,
+            )
+            return {
+                "changed": False,
+                "was_enabled": True,
+                "now_enabled": True,
+                "note": "account was already enabled; no write performed",
+            }
+
+        # Step 3: account is disabled — PATCH to re-enable
+        log.info("GraphService.unlock_account: account is disabled, patching", upn=user_principal_name)
+        patch_resp = requests.patch(url, headers=headers, json={"accountEnabled": True})
+        _check_response(patch_resp, "unlock_account/patch")
+
+        # Step 4: re-read to confirm write stuck
+        confirm_resp = requests.get(url, headers=headers, params={"$select": "accountEnabled"})
+        _check_response(confirm_resp, "unlock_account/confirm_state")
+        now_enabled = confirm_resp.json().get("accountEnabled")
+
+        if not now_enabled:
+            raise RuntimeError(
+                f"unlock_account: PATCH returned 204 but accountEnabled is still False "
+                f"on re-read for {user_principal_name}. Possible replication lag or policy block."
+            )
+
+        log.info(
+            "GraphService.unlock_account: account successfully re-enabled",
+            upn=user_principal_name,
+            was_enabled=False,
+            now_enabled=True,
+        )
+        return {
+            "changed": True,
+            "was_enabled": False,
+            "now_enabled": True,
+            "note": "account was disabled; re-enabled via Graph PATCH and confirmed on re-read",
+        }
 
     def reset_password(self, user_principal_name: str, temporary_password: str) -> bool:
         """
