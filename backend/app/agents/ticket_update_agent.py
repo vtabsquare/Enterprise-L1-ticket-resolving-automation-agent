@@ -2,6 +2,7 @@
 ticket_update_agent.py — Updates the source ITSM ticket after successful tool execution.
 """
 
+import time
 import structlog
 
 from app.schemas.execution import ExecutionResult
@@ -12,6 +13,22 @@ from app.agents.audit_agent import AuditAgent
 from app.agents.agent_utils import safe_call
 
 log = structlog.get_logger(__name__)
+
+
+def _retry_once(fn, *, ticket_id: str, call: str):
+    """Run fn(); on any exception wait 2 s and retry once, then re-raise."""
+    try:
+        return fn()
+    except Exception as e:
+        log.warning(
+            "Supabase call failed — retrying once",
+            ticket_id=ticket_id,
+            call=call,
+            error=str(e),
+        )
+        time.sleep(2)
+        return fn()
+
 
 class TicketUpdateAgent:
     """
@@ -34,7 +51,10 @@ class TicketUpdateAgent:
         """
         log.info("TicketUpdateAgent starting", ticket_id=ticket_id)
 
-        ticket = supabase_service.get_ticket_by_id(ticket_id)
+        ticket = _retry_once(
+            lambda: supabase_service.get_ticket_by_id(ticket_id),
+            ticket_id=ticket_id, call="get_ticket_by_id",
+        )
         if not ticket:
             raise ValueError(f"Ticket {ticket_id} not found")
 
@@ -66,7 +86,10 @@ class TicketUpdateAgent:
         # DB writes are more critical — still wrapped, but re-raise on failure
         try:
             # Update local Supabase DB to mark the ticket as resolved
-            supabase_service.update_ticket(ticket_id, {"status": "resolved"})
+            _retry_once(
+                lambda: supabase_service.update_ticket(ticket_id, {"status": "resolved"}),
+                ticket_id=ticket_id, call="update_ticket",
+            )
 
             # Log Agent Action
             safe_call(
@@ -74,7 +97,7 @@ class TicketUpdateAgent:
                     "ticket_id": ticket_id,
                     "agent_name": "TicketUpdateAgent",
                     "action_type": "update_ticket",
-                    "result": {
+                    "payload": {
                         "status": "resolved",
                         "comment": comment,
                         "comment_posted": comment_posted,
