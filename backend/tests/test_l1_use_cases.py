@@ -573,7 +573,7 @@ async def test_vpn_password_reset(jira_client, supabase_client, wait_for_ticket_
     
     test_passed = False
     try:
-        ticket1 = wait_for_ticket_completion(supabase_client, issue_key1)
+        ticket1 = wait_for_ticket_completion(supabase_client, issue_key1, timeout=60)
         assert ticket1["status"] == "resolved"
         
         ticket2 = wait_for_ticket_completion(supabase_client, issue_key2)
