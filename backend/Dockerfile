@@ -4,7 +4,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: dependency builder ───────────────────────────────────────────────
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /build
 
@@ -22,7 +22,7 @@ RUN pip install --upgrade pip \
 
 
 # ── Stage 2: final runtime image ──────────────────────────────────────────────
-FROM python:3.11-slim AS runtime
+FROM python:3.11-slim-bookworm AS runtime
 
 LABEL maintainer="l1-platform-team"
 LABEL description="Enterprise Agentic AI L1 Support Automation Platform — Backend"
