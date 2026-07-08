@@ -40,11 +40,12 @@ COPY --from=builder /install /usr/local
 
 WORKDIR /app
 
-# Copy application source
-COPY app/ ./app/
-
 # Non-root user for security
-RUN groupadd -r l1agent && useradd -r -g l1agent l1agent
+RUN groupadd -r l1agent && useradd -r -g l1agent l1agent && chown l1agent:l1agent /app
+
+# Copy application source
+COPY --chown=l1agent:l1agent app/ ./app/
+
 USER l1agent
 
 # Expose FastAPI port
