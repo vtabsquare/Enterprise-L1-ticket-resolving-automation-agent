@@ -10,6 +10,14 @@ Responsibilities:
 """
 
 import sys
+
+# Force UTF-8 on Windows stdout/stderr — prevents 'charmap' codec errors when
+# the LLM generates non-ASCII characters (e.g. → arrows) in free-text responses.
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if sys.stderr.encoding and sys.stderr.encoding.lower() not in ("utf-8", "utf8"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 import logging
 import logging.handlers
 from contextlib import asynccontextmanager
@@ -105,6 +113,41 @@ log = structlog.get_logger(__name__)
 
 # ── Lifespan (startup + shutdown) ─────────────────────────────────────────────
 
+def check_policy_coverage():
+    """Verify that every expected category has at least one policy row."""
+    from app.services.supabase_service import get_supabase_client
+    
+    EXPECTED_CATEGORIES = {
+        "password_reset", "account_unlock", "password_expiry_assistance",
+        "vpn_connectivity_issue", "vpn_password_reset", "vpn_account_unlock",
+        "vpn_access_request", "vpn_profile_reset", "user_enable_disable",
+        "group_membership_validation", "software_access", "software_install_request",
+        "email_issue", "mailbox_access_issue", "outlook_profile_reset",
+        "distribution_list_update", "mail_forwarding_request", "shared_folder_access",
+        "hardware_issue", "printer_issue", "network_connectivity",
+        "network_adapter_issue", "dns_flush_guidance", "onboarding", "offboarding",
+        "first_time_password_setup", "temporary_account_activation", "vpn_configuration_guide",
+        "general_it", "unknown"
+    }
+
+    try:
+        client = get_supabase_client()
+        # Get all distinct categories currently in the policies table
+        res = client.table("policies").select("category").execute()
+        active_categories = {row["category"] for row in res.data}
+        
+        missing = EXPECTED_CATEGORIES - active_categories
+        if missing:
+            log.warning(
+                "Policy coverage gap detected: The following categories have ZERO policy rows. "
+                "Tickets in these categories will automatically escalate.",
+                missing_categories=list(missing)
+            )
+        else:
+            log.info("Policy coverage check passed (all categories have >= 1 policy).")
+    except Exception as e:
+        log.error("Failed to check policy coverage at startup", error=str(e))
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Runs once on startup; cleanup runs on shutdown."""
@@ -119,7 +162,9 @@ async def lifespan(app: FastAPI):
 
     # Verify DB connectivity at startup (non-fatal — allows degraded boot)
     db_ok = check_db_connection()
-    if not db_ok:
+    if db_ok:
+        check_policy_coverage()
+    else:
         log.warning("Database connection check failed at startup — continuing in degraded mode")
 
     yield  # ← application runs here
@@ -148,7 +193,13 @@ def create_app() -> FastAPI:
     # ── CORS (dashboard React app) ────────────────────────────────────────────
     # Restrict in production to your actual dashboard origin
     origins = (
-        ["*"]
+        [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "*"
+        ]
         if settings.is_development
         else ["https://your-dashboard-domain.example.com"]
     )
@@ -172,6 +223,11 @@ def create_app() -> FastAPI:
         """
         Returns connectivity status for the database and Redis.
         Used by Docker health checks, load balancers, and monitoring.
+
+        Redis is used for Celery broker/result-backend support, not the
+        synchronous Jira webhook -> agent pipeline. A local development server
+        can process L1 tickets while Redis is unavailable, so DB connectivity
+        controls the HTTP status and Redis is reported as a separate component.
         """
         import redis as redis_lib
         settings = get_settings()
@@ -182,10 +238,11 @@ def create_app() -> FastAPI:
             r = redis_lib.from_url(settings.redis_url, socket_timeout=2)
             r.ping()
             redis_ok = True
-        except Exception:
+        except Exception as e:
             redis_ok = False
+            log.warning("Redis health check failed", error=str(e))
 
-        overall = "healthy" if (db_ok and redis_ok) else "degraded"
+        overall = "healthy" if db_ok else "degraded"
         status_code = 200 if overall == "healthy" else 503
 
         return JSONResponse(

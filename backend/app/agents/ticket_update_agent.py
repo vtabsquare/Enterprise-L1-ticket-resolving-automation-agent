@@ -2,7 +2,6 @@
 ticket_update_agent.py — Updates the source ITSM ticket after successful tool execution.
 """
 
-import time
 import structlog
 
 from app.schemas.execution import ExecutionResult
@@ -10,24 +9,9 @@ from app.services import supabase_service
 from app.services.servicenow_service import get_servicenow_client
 from app.services.jira_service import get_jira_client
 from app.agents.audit_agent import AuditAgent
-from app.agents.agent_utils import safe_call
+from app.agents.agent_utils import retry_once, safe_call
 
 log = structlog.get_logger(__name__)
-
-
-def _retry_once(fn, *, ticket_id: str, call: str):
-    """Run fn(); on any exception wait 2 s and retry once, then re-raise."""
-    try:
-        return fn()
-    except Exception as e:
-        log.warning(
-            "Supabase call failed — retrying once",
-            ticket_id=ticket_id,
-            call=call,
-            error=str(e),
-        )
-        time.sleep(2)
-        return fn()
 
 
 class TicketUpdateAgent:
@@ -51,16 +35,16 @@ class TicketUpdateAgent:
         """
         log.info("TicketUpdateAgent starting", ticket_id=ticket_id)
 
-        ticket = _retry_once(
+        ticket = retry_once(
             lambda: supabase_service.get_ticket_by_id(ticket_id),
-            ticket_id=ticket_id, call="get_ticket_by_id",
+            agent="TicketUpdateAgent", ticket_id=ticket_id, call="Supabase get_ticket_by_id",
         )
         if not ticket:
             raise ValueError(f"Ticket {ticket_id} not found")
 
         source = ticket.get("source", "servicenow")
         external_id = ticket.get("external_id")
-        
+
         client = TicketUpdateAgent._get_client(source)
 
         # Format the resolution comment
@@ -86,9 +70,9 @@ class TicketUpdateAgent:
         # DB writes are more critical — still wrapped, but re-raise on failure
         try:
             # Update local Supabase DB to mark the ticket as resolved
-            _retry_once(
+            retry_once(
                 lambda: supabase_service.update_ticket(ticket_id, {"status": "resolved"}),
-                ticket_id=ticket_id, call="update_ticket",
+                agent="TicketUpdateAgent", ticket_id=ticket_id, call="Supabase update_ticket",
             )
 
             # Log Agent Action

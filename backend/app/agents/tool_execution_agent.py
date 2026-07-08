@@ -10,10 +10,31 @@ from app.schemas.action_plan import ActionPlan
 from app.schemas.execution import ExecutionResult
 from app.services.graph_service import get_graph_service
 from app.agents.audit_agent import AuditAgent
+from app.agents.agent_utils import retry_once, safe_call
 from app.services import supabase_service
 from app.config import get_settings
 
 log = structlog.get_logger(__name__)
+
+def _sanitize_text(text: str) -> str:
+    """Replace common LLM-generated non-ASCII chars with ASCII equivalents.
+    Prevents 'charmap' codec errors on Windows when structlog writes to stdout."""
+    replacements = {
+        "\u2192": "->",   # →
+        "\u2190": "<-",   # ←
+        "\u2022": "-",    # •
+        "\u2013": "-",    # –
+        "\u2014": "--",   # —
+        "\u2018": "'",    # '
+        "\u2019": "'",    # '
+        "\u201c": '"',    # "
+        "\u201d": '"',    # "
+        "\u2026": "...",  # …
+    }
+    for char, replacement in replacements.items():
+        text = text.replace(char, replacement)
+    return text
+
 
 class ToolExecutionAgent:
     """
@@ -29,13 +50,13 @@ class ToolExecutionAgent:
         Retries exactly once on failure.
         """
         log.info("ToolExecutionAgent starting", ticket_id=ticket_id, action_type=action_plan.action_type)
-        
+
         if action_plan.action_type == "escalate":
             raise ValueError("ToolExecutionAgent should never receive 'escalate'. PolicyEngine must intercept this.")
 
         graph = get_graph_service()
         params = action_plan.parameters
-        
+
         def _attempt() -> Any:
             """Inner function to route the action and execute it."""
             if action_plan.action_type == "password_reset":
@@ -59,12 +80,63 @@ class ToolExecutionAgent:
                     user_principal_name=params.get("user_email", ""),
                     list_email=params.get("list_email", "")
                 )
+            elif action_plan.action_type == "check_group_membership":
+                user_email = params.get("user_email", "")
+                group_name_or_id = params.get("group_id", params.get("group", "UnknownGroup"))
+                is_member = graph.check_group_membership(
+                    user_principal_name=user_email,
+                    group_name_or_id=group_name_or_id,
+                )
+
+                membership_status = "is" if is_member else "is NOT"
+                answer = f"{'Yes' if is_member else 'No'}, {user_email} {membership_status} a member of {group_name_or_id}."
+
+                ticket_row = retry_once(
+                    lambda: supabase_service.get_ticket_by_id(ticket_id),
+                    agent="ToolExecutionAgent", ticket_id=ticket_id, call="Supabase get_ticket_by_id",
+                )
+                reporter_email = (ticket_row or {}).get("reporter_email") if ticket_row else None
+                settings = get_settings()
+
+                recipient = (
+                    params.get("user_email")
+                    or params.get("to")
+                    or reporter_email
+                    or settings.test_notification_email
+                )
+
+                if not recipient:
+                    raise ValueError("check_group_membership: no recipient available to send confirmation email")
+
+                email_subject = f"Group membership result: {group_name_or_id}"
+                email_body = (
+                    f"Group membership verification completed.\n\n"
+                    f"User: {user_email}\n"
+                    f"Group: {group_name_or_id}\n"
+                    f"Result: {answer}"
+                )
+
+                email_sent = graph.send_email(
+                    to=recipient,
+                    subject=_sanitize_text(email_subject),
+                    body=_sanitize_text(email_body),
+                )
+                return {
+                    "is_member": is_member,
+                    "user_email": user_email,
+                    "group": group_name_or_id,
+                    "answer": answer,
+                    "email_sent": email_sent,
+                }
             elif action_plan.action_type == "send_email":
                 # Recipient priority:
                 #   1. Gemini's plan explicitly set user_email / to in parameters
                 #   2. reporter_email stored on the ticket (from Jira/ServiceNow webhook)
                 #   3. TEST_NOTIFICATION_EMAIL from .env (dev/test fallback)
-                ticket_row = supabase_service.get_ticket_by_id(ticket_id)
+                ticket_row = retry_once(
+                    lambda: supabase_service.get_ticket_by_id(ticket_id),
+                    agent="ToolExecutionAgent", ticket_id=ticket_id, call="Supabase get_ticket_by_id",
+                )
                 reporter_email = (ticket_row or {}).get("reporter_email") if ticket_row else None
                 settings = get_settings()
                 fallback = settings.test_notification_email
@@ -91,8 +163,8 @@ class ToolExecutionAgent:
 
                 return graph.send_email(
                     to=recipient,
-                    subject=params.get("subject", "IT Helpdesk Update"),
-                    body=params.get("body", "Please contact IT support.")
+                    subject=_sanitize_text(params.get("subject", "IT Helpdesk Update")),
+                    body=_sanitize_text(params.get("body", "Please contact IT support."))
                 )
             else:
                 raise ValueError(f"Unknown action_type mapped to ToolExecutionAgent: {action_plan.action_type}")
@@ -102,14 +174,17 @@ class ToolExecutionAgent:
         noop = False          # True when ad_unlock found account already enabled
         message = ""
         raw_response = None
-        
+
         # Execution loop (1 initial attempt + 1 retry = 2 max attempts)
         for attempt in range(2):
             try:
                 result_data = _attempt()
 
                 # ad_unlock returns a dict — inspect it to distinguish real vs no-op
-                if action_plan.action_type == "ad_unlock" and isinstance(result_data, dict):
+                if action_plan.action_type == "check_group_membership" and isinstance(result_data, dict):
+                    message = result_data["answer"]
+                    raw_response = result_data
+                elif action_plan.action_type == "ad_unlock" and isinstance(result_data, dict):
                     if result_data.get("changed") is False:
                         noop = True
                         message = (
@@ -128,7 +203,7 @@ class ToolExecutionAgent:
 
                 success = True
                 break
-                
+
             except Exception as e:
                 log.warning(
                     "Tool execution failed",
@@ -154,13 +229,20 @@ class ToolExecutionAgent:
 
         # agent_action: noop gets its own status so the DB is unambiguous
         action_status = "noop" if noop else ("success" if success else "failed")
-        supabase_service.insert_agent_action({
-            "ticket_id": ticket_id,
-            "agent_name": "ToolExecutionAgent",
-            "action_type": "tool_execute",
-            "result": result.model_dump(),
-            "status": action_status,
-        })
+        safe_call(
+            lambda: retry_once(
+                lambda: supabase_service.insert_agent_action({
+                    "ticket_id": ticket_id,
+                    "agent_name": "ToolExecutionAgent",
+                    "action_type": "tool_execute",
+                    "payload": result.model_dump(),
+                    "status": action_status,
+                }),
+                agent="ToolExecutionAgent", ticket_id=ticket_id, call="Supabase insert_agent_action",
+            ),
+            agent="ToolExecutionAgent", ticket_id=ticket_id,
+            call="Supabase insert_agent_action",
+        )
 
         # audit event: three distinct values
         if noop:

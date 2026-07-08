@@ -337,7 +337,7 @@ async def test_network_connectivity_severe(jira_client, supabase_client, wait_fo
         assert plan["payload"]["action_type"] == "escalate"
         
         reason = get_policy_escalation_reason(supabase_client, ticket["id"])
-        assert "explicitly requested escalation" in reason.lower()
+        assert "escalated by ai planner" in reason.lower()
         test_passed = True
     finally:
         if test_passed:
@@ -375,7 +375,7 @@ async def test_hardware_issue(jira_client, supabase_client, wait_for_ticket_comp
         assert any(kw in plan["payload"].get("reasoning", "").lower() for kw in ["physical", "hardware", "human"])
         
         reason = get_policy_escalation_reason(supabase_client, ticket["id"])
-        assert "explicitly requested escalation" in reason.lower()
+        assert "escalated by ai planner" in reason.lower()
         test_passed = True
     finally:
         if test_passed:
@@ -616,6 +616,44 @@ async def test_dl_update(jira_client, supabase_client, wait_for_ticket_completio
         assert ticket["status"] == "escalated"
         
         # Verify action plan still chose dl_update
+        action = get_agent_action(supabase_client, ticket["id"], "generate_plan")
+        assert action["payload"]["action_type"] == "dl_update"
+        test_passed = True
+    finally:
+        if test_passed:
+            jira_client.delete_ticket(issue_key)
+        else:
+            jira_client.update_summary(issue_key, f"[FAILED TEST] {issue_key}")
+
+
+@pytest.mark.asyncio
+async def test_dl_update(jira_client, supabase_client, wait_for_ticket_completion):
+    issue_key = jira_client.create_test_ticket("Update DL", f"Please add {TEST_USER_EMAIL} to the engineering-team distribution list. Email: {TEST_USER_EMAIL}")
+    test_passed = False
+    try:
+        ticket = wait_for_ticket_completion(supabase_client, issue_key)
+        assert ticket["status"] == "resolved"
+        
+        # Verify action
+        action = get_agent_action(supabase_client, ticket["id"], "generate_plan")
+        assert action["payload"]["action_type"] == "dl_update"
+        test_passed = True
+    finally:
+        if test_passed:
+            jira_client.delete_ticket(issue_key)
+        else:
+            jira_client.update_summary(issue_key, f"[FAILED TEST] {issue_key}")
+
+
+@pytest.mark.asyncio
+async def test_dl_update(jira_client, supabase_client, wait_for_ticket_completion):
+    issue_key = jira_client.create_test_ticket("Update DL", f"Please add {TEST_USER_EMAIL} to the engineering-team distribution list. Email: {TEST_USER_EMAIL}")
+    test_passed = False
+    try:
+        ticket = wait_for_ticket_completion(supabase_client, issue_key)
+        assert ticket["status"] == "resolved"
+        
+        # Verify action
         action = get_agent_action(supabase_client, ticket["id"], "generate_plan")
         assert action["payload"]["action_type"] == "dl_update"
         test_passed = True

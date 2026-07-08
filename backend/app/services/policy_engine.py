@@ -161,8 +161,9 @@ def evaluate(
 
     # ── Check 0: Explicit Escalate Action ──────────────────────────────────────
     if action_plan.action_type == "escalate":
+        reason = action_plan.reasoning or "Plan explicitly requested escalation."
         return _escalate(
-            "Plan explicitly requested escalation.",
+            f"Escalated by AI Planner: {reason}",
             policy_id=None
         )
 
@@ -191,9 +192,11 @@ def evaluate(
 
     # ── Check 3: allow_auto flag ───────────────────────────────────────────────
     if not policy.get("allow_auto", False):
+        reason = f"Policy '{policy.get('policy_name')}' requires manual approval (allow_auto=false)."
+        if action_plan.reasoning:
+            reason += f" AI Note: {action_plan.reasoning}"
         return _escalate(
-            f"Policy '{policy.get('policy_name')}' requires manual approval "
-            f"(allow_auto=false).",
+            reason,
             policy_id=policy_id,
         )
 

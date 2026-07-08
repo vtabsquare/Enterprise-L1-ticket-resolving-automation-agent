@@ -22,7 +22,7 @@ from pydantic import ValidationError
 from app.services import supabase_service
 from app.services.gemini_service import get_gemini_service
 from app.agents.audit_agent import AuditAgent
-from app.agents.agent_utils import safe_call
+from app.agents.agent_utils import retry_once, safe_call
 from app.schemas.action_plan import ActionPlan
 
 log = structlog.get_logger(__name__)
@@ -41,6 +41,7 @@ _ACTION_SYSTEM_MAP = {
     "password_reset": "ad",
     "ad_unlock":      "ad",
     "group_add":      "graph",
+    "check_group_membership": "graph",
     "send_email":     "email",
     "create_ticket":  "jira",
     "escalate":       "jira",
@@ -71,7 +72,7 @@ def _gemini_response_to_action_plan(
     reasoning     = raw.get("reasoning", "")
     # Extract target_system from the LLM directly, falling back to the map if omitted
     target_system = (raw.get("target_system") or _ACTION_SYSTEM_MAP.get(action_type, "jira")).strip().lower()
-    
+
     # Extract plan_confidence from the LLM directly, falling back to classification confidence
     confidence = float(raw.get("plan_confidence") or raw.get("confidence", fallback_confidence))
 
@@ -109,6 +110,7 @@ def _attempt_plan(
             attempt=attempt,
             error=str(e),
             error_type=type(e).__name__,
+            raw_response=raw,
         )
         return None
     except Exception as e:
@@ -137,7 +139,10 @@ class PlanningAgent:
         """
         log.info("PlanningAgent starting", ticket_id=ticket_id)
 
-        ticket = supabase_service.get_ticket_by_id(ticket_id)
+        ticket = retry_once(
+            lambda: supabase_service.get_ticket_by_id(ticket_id),
+            agent="PlanningAgent", ticket_id=ticket_id, call="Supabase get_ticket_by_id",
+        )
         if not ticket:
             raise ValueError(f"Ticket {ticket_id} not found")
 
@@ -147,14 +152,19 @@ class PlanningAgent:
         # ── Attempt 1 ─────────────────────────────────────────────────────────
         action_plan = _attempt_plan(gemini, ticket, classification, kb_context, 1, fallback_confidence)
 
-        # ── Attempt 2 (retry on failure) ──────────────────────────────────────
+        # ── Attempt 2 ─────────────────────────────────────────────────────────
         if action_plan is None:
-            log.warning("PlanningAgent retrying plan generation", ticket_id=ticket_id)
+            log.warning("PlanningAgent retrying plan generation (Attempt 2)", ticket_id=ticket_id)
             action_plan = _attempt_plan(gemini, ticket, classification, kb_context, 2, fallback_confidence)
+
+        # ── Attempt 3 ─────────────────────────────────────────────────────────
+        if action_plan is None:
+            log.warning("PlanningAgent retrying plan generation (Attempt 3)", ticket_id=ticket_id)
+            action_plan = _attempt_plan(gemini, ticket, classification, kb_context, 3, fallback_confidence)
 
         # ── Fallback ──────────────────────────────────────────────────────────
         if action_plan is None:
-            log.error("PlanningAgent failed both attempts, using escalation fallback", ticket_id=ticket_id)
+            log.error("PlanningAgent failed all 3 attempts, using escalation fallback", ticket_id=ticket_id)
             action_plan = ActionPlan(**_ESCALATE_FALLBACK)
 
         # Log agent action
@@ -163,7 +173,7 @@ class PlanningAgent:
                 "ticket_id": ticket_id,
                 "agent_name": "PlanningAgent",
                 "action_type": "generate_plan",
-                "result": action_plan.model_dump(),
+                "payload": action_plan.model_dump(),
                 "status": "success",
             }),
             agent="PlanningAgent", ticket_id=ticket_id,

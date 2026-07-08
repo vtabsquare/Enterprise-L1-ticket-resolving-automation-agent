@@ -32,6 +32,7 @@ Choose the most SPECIFIC matching category — do not fall back to a generic buc
 CATEGORIES AND EXAMPLES:
 
 # Account / Password
+- first_time_password_setup → "First time logging in, need my password", "How do I set up my new employee password?", "Just joined, need to generate my initial password"
 - password_reset          → "I forgot my Windows password", "My domain password expired and I'm locked out", "Reset my AD credentials"
 - account_unlock          → "My account is locked after too many failed attempts", "AD account locked, please unlock", "Locked out of domain login"
 - password_expiry_assistance → "My password is about to expire, how do I change it?", "Got a warning that password expires in 5 days", "How do I update my password before it expires?"
@@ -41,9 +42,11 @@ CATEGORIES AND EXAMPLES:
 - vpn_password_reset      → "My VPN password expired", "Can't log into VPN due to wrong password", "Need to reset my VPN credentials"
 - vpn_account_unlock      → "VPN account is locked after failed attempts", "Locked out of Cisco AnyConnect", "VPN authentication failing, account locked"
 - vpn_access_request      → "New contractor needs VPN access", "Please provision VPN for my team member", "Request VPN access for new hire"
+- vpn_configuration_guide → "How do I set up the VPN for the first time?", "Need instructions to configure VPN on my new laptop", "What is the VPN portal address?"
 - vpn_profile_reset       → "VPN profile is corrupted", "Need to reinstall VPN client profile", "VPN config stuck, how do I reset it?"
 
 # Active Directory / Identity
+- temporary_account_activation → "Activate temporary contractor account", "Grant temporary access for auditor", "Need 2-week temp account activated"
 - user_enable_disable     → "Please disable the account of departing employee", "Enable account for returning employee", "Deactivate AD account for John Smith"
 - group_membership_validation → "Check if user is in the correct security group", "Validate group membership for audit", "Is user in the VPN Users group?"
 
@@ -109,6 +112,8 @@ higher-risk action (e.g. "reset my password now", "unlock immediately").
 CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
 
 # Account / Password
+- first_time_password_setup    → proposed_action: send_email
+                                  (KB guidance: explain how to set up password for the first time)
 - password_reset               → proposed_action: password_reset
                                   (only when user says "reset now" / "reset immediately")
 - password_expiry_assistance   → proposed_action: send_email
@@ -128,14 +133,18 @@ CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
                                   (locked VPN/AD account — safe to auto-unlock)
 - vpn_access_request           → proposed_action: group_add
                                   (provision user into VPN security group)
+- vpn_configuration_guide      → proposed_action: send_email
+                                  (KB steps to set up the VPN client for the first time)
 - vpn_profile_reset            → proposed_action: send_email
                                   (KB steps to delete and reinstall VPN client profile)
 
 # Active Directory / Identity
+- temporary_account_activation → proposed_action: escalate
+                                  (high-risk write action — always requires human approval)
 - user_enable_disable          → proposed_action: escalate
                                   (high-risk write action — always requires human approval)
-- group_membership_validation  → proposed_action: send_email
-                                  (read-only check — post result as KB guidance reply)
+- group_membership_validation  → proposed_action: check_group_membership
+                                  (calls Graph API to verify membership, sends confirmation if true)
 
 # Software Access / Licensing
 - software_access              → proposed_action: group_add
@@ -166,6 +175,7 @@ CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
 # Network
 - network_connectivity         → proposed_action: send_email
                                   (KB troubleshooting: check cable, restart adapter, etc.)
+                                  EXCEPTION: if the ticket reports a severe/site-wide outage → escalate
 - network_adapter_issue        → proposed_action: send_email
                                   (KB steps to re-enable adapter via Device Manager)
 - dns_flush_guidance           → proposed_action: send_email
@@ -187,10 +197,11 @@ CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
 Output ONLY valid JSON in the following format, with no markdown formatting or extra text:
 {{
     "reasoning": "Explain step-by-step why you chose this plan, referencing the KB articles, ticket wording, and the category-to-action mapping above.",
-    "proposed_action": "MUST be exactly one of: 'password_reset', 'ad_unlock', 'group_add', 'send_email', 'escalate', 'dl_update'",
+    "proposed_action": "MUST be exactly one of: 'password_reset', 'ad_unlock', 'group_add', 'send_email', 'escalate', 'dl_update', 'check_group_membership'",
     "target_system": "The specific system this action applies to. Use 'ad' for AD actions, 'graph' for send_email, 'jira' or 'servicenow' for ITSM actions.",
     "action_payload": {{
         "user_email": "the reporter's email address if identifiable from the ticket text, otherwise leave as empty string",
+        "group_id": "for check_group_membership or group_add: the group id to check or add against",
         "list_email": "for dl_update: the email or best guess name of the distribution list from the ticket text",
         "subject": "for send_email: a concise, helpful subject line for the guidance email",
         "body": "for send_email: the full guidance text to send to the user, drawn from the matched KB articles"
@@ -233,13 +244,21 @@ class GeminiService:
 
     def _parse_json_response(self, text: str) -> dict[str, Any]:
         """Cleans markdown backticks and parses JSON robustly."""
-        # Use regex to find everything between ```json and ``` or just ``` and ```
-        match = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
-        if match:
-            clean_text = match.group(1)
-        else:
-            clean_text = text.strip()
-            
+        clean_text = text.strip()
+        if clean_text.startswith("```"):
+            newline_idx = clean_text.find("\n")
+            if newline_idx != -1:
+                clean_text = clean_text[newline_idx+1:]
+        if clean_text.endswith("```"):
+            clean_text = clean_text[:-3].strip()
+
+        # Try to isolate the JSON block if conversational text exists
+        start = clean_text.find('{')
+        end = clean_text.rfind('}')
+        if start != -1 and end != -1 and end >= start:
+            clean_text = clean_text[start:end+1]
+
+        clean_text = clean_text.strip()
         try:
             return json.loads(clean_text)
         except json.JSONDecodeError as e:

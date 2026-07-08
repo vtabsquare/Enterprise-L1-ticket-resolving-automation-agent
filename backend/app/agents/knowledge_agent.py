@@ -8,7 +8,7 @@ from typing import Any
 from app.services import supabase_service
 from app.services.gemini_service import get_gemini_service
 from app.agents.audit_agent import AuditAgent
-from app.agents.agent_utils import safe_call
+from app.agents.agent_utils import retry_once, safe_call
 
 log = structlog.get_logger(__name__)
 
@@ -18,17 +18,20 @@ class KnowledgeAgent:
     def retrieve_context(ticket_id: str, match_count: int = 5) -> list[dict[str, Any]]:
         """
         Retrieves top KB matches using vector similarity search.
-        
+
         Args:
             ticket_id: The UUID of the ticket.
             match_count: Maximum number of articles to retrieve.
-            
+
         Returns:
             List of relevant knowledge base articles.
         """
         log.info("KnowledgeAgent starting", ticket_id=ticket_id)
-        
-        ticket = supabase_service.get_ticket_by_id(ticket_id)
+
+        ticket = retry_once(
+            lambda: supabase_service.get_ticket_by_id(ticket_id),
+            agent="KnowledgeAgent", ticket_id=ticket_id, call="Supabase get_ticket_by_id",
+        )
         if not ticket:
             raise ValueError(f"Ticket {ticket_id} not found")
 
@@ -48,7 +51,7 @@ class KnowledgeAgent:
                 "ticket_id": ticket_id,
                 "agent_name": "KnowledgeAgent",
                 "action_type": "kb_retrieval",
-                "result": {"articles_found": len(matches), "top_matches": [m["title"] for m in matches]},
+                "payload": {"articles_found": len(matches), "top_matches": [m["title"] for m in matches]},
                 "status": "success",
             }),
             agent="KnowledgeAgent", ticket_id=ticket_id,

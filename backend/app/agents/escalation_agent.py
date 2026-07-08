@@ -8,7 +8,7 @@ from app.services import supabase_service
 from app.services.servicenow_service import get_servicenow_client
 from app.services.jira_service import get_jira_client
 from app.agents.audit_agent import AuditAgent
-from app.agents.agent_utils import safe_call
+from app.agents.agent_utils import retry_once, safe_call
 
 log = structlog.get_logger(__name__)
 
@@ -33,14 +33,17 @@ class EscalationAgent:
         """
         log.info("EscalationAgent starting", ticket_id=ticket_id)
 
-        ticket = supabase_service.get_ticket_by_id(ticket_id)
+        ticket = retry_once(
+            lambda: supabase_service.get_ticket_by_id(ticket_id),
+            agent="EscalationAgent", ticket_id=ticket_id, call="Supabase get_ticket_by_id",
+        )
         if not ticket:
             raise ValueError(f"Ticket {ticket_id} not found")
 
         source = ticket.get("source", "servicenow")
         external_id = ticket.get("external_id")
         category = ticket.get("category", "unknown")
-        
+
         # Look up resolver group by category
         try:
             client_db = supabase_service.get_supabase_client()
@@ -54,7 +57,7 @@ class EscalationAgent:
         group_name = resolver_group.get("group_name", "L2 Support")
 
         client = EscalationAgent._get_client(source)
-        
+
         comment = (
             f"Agentic IT L1 Automation: Routing to {group_name} for manual review.\n"
             f"Reason: {reason}"
@@ -70,12 +73,24 @@ class EscalationAgent:
         try:
             # Record escalation in the escalations table (for Phase 6 dashboard)
             from datetime import datetime, timezone
-            supabase_service.get_supabase_client().table("escalations").insert({
-                "ticket_id": ticket_id,
-                "reason": reason,
-                "escalated_to": escalation_target,
-                "notified_at": datetime.now(timezone.utc).isoformat()
-            }).execute()
+            retry_once(
+                lambda: supabase_service.get_supabase_client().table("escalations").insert({
+                    "ticket_id": ticket_id,
+                    "reason": reason,
+                    "escalated_to": escalation_target,
+                    "notified_at": datetime.now(timezone.utc).isoformat()
+                }).execute(),
+                agent="EscalationAgent", ticket_id=ticket_id, call="Supabase insert escalation",
+            )
+
+            # Update ticket status to escalated
+            safe_call(
+                lambda: supabase_service.get_supabase_client().table("tickets").update({
+                    "status": "escalated"
+                }).eq("id", ticket_id).execute(),
+                agent="EscalationAgent", ticket_id=ticket_id,
+                call="Supabase update tickets status"
+            )
 
             # Record action in local DB
             safe_call(
@@ -83,7 +98,7 @@ class EscalationAgent:
                     "ticket_id": ticket_id,
                     "agent_name": "EscalationAgent",
                     "action_type": "escalate",
-                    "result": {
+                    "payload": {
                         "target": escalation_target,
                         "reason": reason,
                         "comment_posted": comment_posted,

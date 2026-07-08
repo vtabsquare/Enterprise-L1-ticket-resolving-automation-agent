@@ -21,6 +21,9 @@ env/
 logs/
 *.log
 
+# ── Scratch & Test Outputs ────────────────────────────────────────────────────
+scratch/
+
 # ── Celery ────────────────────────────────────────────────────────────────────
 celerybeat-schedule
 celerybeat.pid

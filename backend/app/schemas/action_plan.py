@@ -19,7 +19,7 @@ class ActionPlan(BaseModel):
     The structured plan produced by PlanningAgent after calling Gemini.
     Must pass PolicyEngine validation before any tool may be executed.
     """
-    action_type: Literal["password_reset", "ad_unlock", "group_add", "send_email", "escalate", "dl_update"] = Field(
+    action_type: Literal["password_reset", "ad_unlock", "group_add", "send_email", "escalate", "dl_update", "check_group_membership"] = Field(
         ...,
         description="The specific action to execute. Must be one of the strictly supported tool names."
     )

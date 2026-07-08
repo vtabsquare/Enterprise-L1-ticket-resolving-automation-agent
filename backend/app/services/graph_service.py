@@ -16,6 +16,7 @@ Full implementation in Phase 5.
 import structlog
 import requests
 from functools import lru_cache
+import uuid
 from typing import Optional
 
 import msal
@@ -156,15 +157,22 @@ class GraphService:
         patch_resp = requests.patch(url, headers=headers, json={"accountEnabled": True})
         _check_response(patch_resp, "unlock_account/patch")
 
-        # Step 4: re-read to confirm write stuck
-        confirm_resp = requests.get(url, headers=headers, params={"$select": "accountEnabled"})
-        _check_response(confirm_resp, "unlock_account/confirm_state")
-        now_enabled = confirm_resp.json().get("accountEnabled")
+        # Step 4: re-read to confirm write stuck (allow up to 10s for Graph replication)
+        import time
+        now_enabled = False
+        for i in range(1, 6):
+            time.sleep(2)
+            confirm_resp = requests.get(url, headers=headers, params={"$select": "accountEnabled"})
+            _check_response(confirm_resp, "unlock_account/confirm_state")
+            now_enabled = confirm_resp.json().get("accountEnabled")
+            log.info("Polling for accountEnabled", attempt=i, current_state=now_enabled)
+            if now_enabled:
+                break
 
         if not now_enabled:
             raise RuntimeError(
                 f"unlock_account: PATCH returned 204 but accountEnabled is still False "
-                f"on re-read for {user_principal_name}. Possible replication lag or policy block."
+                f"on re-read after 10s for {user_principal_name}. Possible policy block."
             )
 
         log.info(
@@ -311,6 +319,51 @@ class GraphService:
             status_code=response.status_code,
         )
         return True
+
+    def _resolve_group_id(self, group_name_or_id: str) -> str:
+        try:
+            # If it's a valid UUID, return it
+            import uuid
+            uuid.UUID(group_name_or_id)
+            return group_name_or_id
+        except ValueError:
+            pass
+            
+        if self._is_mock:
+            return "mock-group-id"
+            
+        # Not a UUID, look it up by displayName
+        url = f"https://graph.microsoft.com/v1.0/groups?$filter=displayName eq '{group_name_or_id}'"
+        response = requests.get(url, headers=self._get_headers())
+        _check_response(response, "_resolve_group_id")
+        
+        data = response.json().get("value", [])
+        if len(data) == 1:
+            return data[0]["id"]
+        elif len(data) == 0:
+            raise ValueError(f"Group '{group_name_or_id}' not found in AD.")
+        else:
+            raise ValueError(f"Multiple groups found matching '{group_name_or_id}'. Escalating for manual disambiguation.")
+
+    def check_group_membership(self, user_principal_name: str, group_name_or_id: str) -> bool:
+        """
+        Check if user is a member of the specified group using checkMemberGroups.
+        Resolves group names to IDs automatically.
+        """
+        group_id = self._resolve_group_id(group_name_or_id)
+        if self._is_mock:
+            log.info("GraphService.check_group_membership (MOCK)", upn=user_principal_name, group_id=group_id)
+            return True
+            
+        log.info("GraphService.check_group_membership (REAL)", upn=user_principal_name, group_id=group_id)
+        url = f"https://graph.microsoft.com/v1.0/users/{user_principal_name}/checkMemberGroups"
+        payload = {"groupIds": [group_id]}
+        
+        response = requests.post(url, headers=self._get_headers(), json=payload)
+        _check_response(response, "check_group_membership")
+        
+        member_groups = response.json().get("value", [])
+        return group_id in member_groups
 
     def health_check(self) -> bool:
         """Ping Graph API."""
