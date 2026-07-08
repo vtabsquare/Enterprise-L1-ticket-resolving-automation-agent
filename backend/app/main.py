@@ -201,7 +201,7 @@ def create_app() -> FastAPI:
             "*"
         ]
         if settings.is_development
-        else ["https://your-dashboard-domain.example.com"]
+        else ["https://enterprise-l1-ticket-resolving-cen1.onrender.com"]
     )
     app.add_middleware(
         CORSMiddleware,
