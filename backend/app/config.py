@@ -31,25 +31,29 @@ _REQUIRED_VARS: list[tuple[str, str]] = [
     ("JIRA_BASE_URL",              "Jira instance base URL"),
     ("JIRA_EMAIL",                 "Jira service-account email"),
     ("JIRA_API_TOKEN",             "Jira API token"),
-    ("SERVICENOW_URL",             "ServiceNow instance URL"),
-    ("SERVICENOW_CLIENT_ID",       "ServiceNow OAuth client ID"),
-    ("SERVICENOW_CLIENT_SECRET",   "ServiceNow OAuth client secret"),
-    ("SERVICENOW_USERNAME",        "ServiceNow username"),
-    ("SERVICENOW_PASSWORD",        "ServiceNow password"),
     ("MS_TENANT_ID",               "Microsoft Azure tenant ID"),
     ("MS_CLIENT_ID",               "Microsoft Azure app client ID"),
     ("MS_CLIENT_SECRET",           "Microsoft Azure app client secret"),
 ]
-
 
 def _validate_required_vars() -> None:
     """
     Called once at startup. Prints ALL missing variables at once
     (not one-at-a-time) so the operator can fix everything in one pass.
     """
+    required = list(_REQUIRED_VARS)
+    if os.environ.get("SERVICENOW_MODE", "mock").lower() != "mock":
+        required.extend([
+            ("SERVICENOW_URL",             "ServiceNow instance URL"),
+            ("SERVICENOW_CLIENT_ID",       "ServiceNow OAuth client ID"),
+            ("SERVICENOW_CLIENT_SECRET",   "ServiceNow OAuth client secret"),
+            ("SERVICENOW_USERNAME",        "ServiceNow username"),
+            ("SERVICENOW_PASSWORD",        "ServiceNow password"),
+        ])
+
     missing = [
         f"  • {name}  ({desc})"
-        for name, desc in _REQUIRED_VARS
+        for name, desc in required
         if not os.environ.get(name, "").strip()
     ]
     if missing:
@@ -105,11 +109,11 @@ class Settings:
 
         # ── ServiceNow ────────────────────────────────────────────────────────
         self.servicenow_mode: str            = os.environ.get("SERVICENOW_MODE", "mock")
-        self.servicenow_url: str             = os.environ["SERVICENOW_URL"]
-        self.servicenow_client_id: str       = os.environ["SERVICENOW_CLIENT_ID"]
-        self.servicenow_client_secret: str   = os.environ["SERVICENOW_CLIENT_SECRET"]
-        self.servicenow_username: str        = os.environ["SERVICENOW_USERNAME"]
-        self.servicenow_password: str        = os.environ["SERVICENOW_PASSWORD"]
+        self.servicenow_url: str             = os.environ.get("SERVICENOW_URL", "")
+        self.servicenow_client_id: str       = os.environ.get("SERVICENOW_CLIENT_ID", "")
+        self.servicenow_client_secret: str   = os.environ.get("SERVICENOW_CLIENT_SECRET", "")
+        self.servicenow_username: str        = os.environ.get("SERVICENOW_USERNAME", "")
+        self.servicenow_password: str        = os.environ.get("SERVICENOW_PASSWORD", "")
         self.servicenow_webhook_secret: str  = os.environ.get("SERVICENOW_WEBHOOK_SECRET", "")
 
         # ── Microsoft Graph API ───────────────────────────────────────────────
