@@ -99,8 +99,14 @@ async def test_vpn_account_unlock(jira_client, supabase_client, graph_client, wa
 
         # Verify state change
         headers = graph_client._get_headers()
-        user_data = requests.get(f"https://graph.microsoft.com/v1.0/users/{TEST_USER_EMAIL}?$select=accountEnabled", headers=headers).json()
-        assert user_data.get("accountEnabled") is True
+        account_enabled = None
+        for _ in range(5):
+            user_data = requests.get(f"https://graph.microsoft.com/v1.0/users/{TEST_USER_EMAIL}?$select=accountEnabled", headers=headers).json()
+            account_enabled = user_data.get("accountEnabled")
+            if account_enabled is True:
+                break
+            time.sleep(2)
+        assert account_enabled is True
 
         test_passed = True
     finally:
@@ -140,20 +146,24 @@ async def test_password_reset(jira_client, supabase_client, graph_client, wait_f
 # ── Group Membership Tests ────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_group_validation_escalate(jira_client, supabase_client, wait_for_ticket_completion, group_validation_escalate_setup):
+async def test_group_validation_nonmember(jira_client, supabase_client, wait_for_ticket_completion, group_validation_escalate_setup):
     issue_key = jira_client.create_test_ticket("Check group access", f"Can you verify I am in {ESCALATE_GROUP_NAME}? Email: {TEST_USER_EMAIL}")
     test_passed = False
     try:
         ticket = wait_for_ticket_completion(supabase_client, issue_key)
-        assert ticket["status"] == "escalated"
-        
-        # Verify plan logic
+        # Non-member: tool sends a "No" answer email and resolves — no longer escalates
+        assert ticket["status"] == "resolved"
+
         plan = get_agent_action(supabase_client, ticket["id"], "generate_plan")
         assert plan["payload"]["action_type"] == "check_group_membership"
-        
-        # Verify it escalated due to business logic (not a crash/fake target)
+
+        # raw_response must be a real dict with is_member=False — not null, not an error key
         tool_exec = get_agent_action(supabase_client, ticket["id"], "tool_execute")
-        assert "NOT a member" in tool_exec["payload"]["raw_response"].get("error", "")
+        assert tool_exec["status"] == "success"
+        raw = tool_exec["payload"]["raw_response"]
+        assert raw is not None, "raw_response must not be null"
+        assert raw.get("is_member") is False
+        assert "NOT a member" in raw.get("answer", "")
 
         test_passed = True
     finally:
@@ -169,9 +179,18 @@ async def test_group_validation_success(jira_client, supabase_client, wait_for_t
     try:
         ticket = wait_for_ticket_completion(supabase_client, issue_key)
         assert ticket["status"] == "resolved"
+
         plan = get_agent_action(supabase_client, ticket["id"], "generate_plan")
         assert plan["payload"]["action_type"] == "check_group_membership"
-        
+
+        # raw_response must contain the real membership answer — not null
+        tool_exec = get_agent_action(supabase_client, ticket["id"], "tool_execute")
+        assert tool_exec["status"] == "success"
+        raw = tool_exec["payload"]["raw_response"]
+        assert raw is not None, "raw_response must not be null"
+        assert raw.get("is_member") is True
+        assert "is a member" in raw.get("answer", "")
+
         test_passed = True
     finally:
         if test_passed:
@@ -516,12 +535,11 @@ async def test_account_unlock(jira_client, supabase_client, graph_client, wait_f
         assert ticket["status"] == "resolved"
         
         # Verify state change (Graph API can have slight replication delay)
-        start_time = time.time()
-        is_enabled = False
-        while time.time() - start_time < 10:
+        is_enabled = None
+        for _ in range(5):
             user_data = requests.get(f"{user_url}?$select=accountEnabled", headers=headers).json()
-            if user_data.get("accountEnabled") is True:
-                is_enabled = True
+            is_enabled = user_data.get("accountEnabled")
+            if is_enabled is True:
                 break
             time.sleep(2)
         assert is_enabled is True
