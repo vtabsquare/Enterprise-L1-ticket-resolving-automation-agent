@@ -1,0 +1,295 @@
+﻿,,
+Developer Responsibility,Applicable/Not applicable,Status
+Authentication,,
+Passwords must be at least 12 characters in length.,Applicable,Implemented
+"Passwords of at least 64 characters must be permitted, and passwords exceeding 128 characters must be denied.",Applicable,Implemented
+"Password complexity must be enforced, requiring a combination of lowercase letters, uppercase letters, numbers, and special characters (e.g., Abcde@#12345).",Applicable,Implemented
+Password change functionality must require the user's current password along with the new password.,Applicable,Implemented
+"Passwords submitted during account registration, login, and password change must be checked against a list of weak or commonly used passwords.",Applicable,Implemented
+A password strength meter must be provided to guide users during password creation.,Applicable,Implemented
+Old passwords must not be reused. (Last 5 passwords),,
+Account lockout must be enforced after no more than 5 failed login attempts to prevent unauthorized access.,Applicable,Implemented
+Users must be able to toggle visibility of the masked password on the login or signup form.,Applicable,Implemented
+"Secure notifications must be sent to users after any update to their authentication details (e.g., password change, new device login, email change, account lockout, account deletion).",Applicable,Implemented
+"The password reset page must not include social media buttons. Reset tokens must not be leaked via referrer headers or API responses, and must be strong and unguessable.",Applicable,Implemented
+"MFA must be required to log in even after a password reset, for users who have MFA enabled.",Applicable,Implemented
+The user must be logged out and redirected to the login page immediately after a password change or reset.,Applicable,Implemented
+Password reset links must expire within a maximum of 1 hour.,Applicable,Implemented
+Time-based OTPs must be used for two-factor authentication.,Applicable,Implemented
+The application must prompt users to change their password after 90 days.,Applicable,Implemented
+OTP validation must be performed strictly on the server side. Client-side response values must never be trusted to determine OTP success or failure.,Not Applicable,-
+The MFA/TOTP secret key must not be exposed in API responses before the user successfully completes MFA verification.,Applicable,Implemented
+Biometric authentication must be implemented so it cannot be bypassed via a fallback PIN or password without re-authentication at the application level.,Applicable,Implemented
+Email verification must be enforced before granting a newly registered user full access to the application.,Not Applicable,-
+Account activation must not be achievable through the password reset flow.,Applicable,Implemented
+"MPIN and PIN reuse must be prevented across recent entries, consistent with password history enforcement.",Applicable,Implemented
+"All authentication decisions (OTP match, MFA success, login result) must be determined server-side only. Client-supplied status or role fields in responses must never be trusted.",Applicable,Implemented
+OTPs must be invalidated immediately after successful use and must not be accepted a second time.,Not Applicable,-
+OTP submission attempts must be limited to a maximum of 5 before triggering a lockout or requiring a new OTP.,Applicable,Implemented
+"Login, registration, and password reset endpoints must return identical responses regardless of whether an account exists, to prevent username and account enumeration.",Applicable,Implemented
+"OAuth 2.0 authorization code flows must use PKCE (code_challenge and code_verifier) for all client types, including SPAs and mobile clients. Flows without PKCE must not be accepted.",Applicable,Implemented
+"The OAuth state parameter must be generated with sufficient entropy, stored in the session, and validated on callback to prevent CSRF on OAuth flows.",Applicable,Implemented
+OAuth redirect URIs must be strictly allowlisted server-side. Dynamic or partial matching of redirect URIs is not permitted.,Not Applicable,-
+Session Management,,
+"Session tokens must never be exposed in URL parameters to prevent leakage via logs, referrers, and browser history.",Applicable,Implemented
+A new session token must be generated upon each successful authentication to prevent session fixation.,Applicable,Implemented
+Session tokens must contain at least 64 bits of entropy to resist prediction and brute-force attacks.,Applicable,Implemented
+Session tokens must be generated using approved cryptographic algorithms.,Applicable,Implemented
+Active sessions must be automatically invalidated after a maximum of 30 minutes of user inactivity.,Applicable,Implemented
+Users must be able to explicitly terminate their active session through a logout feature.,Applicable,Implemented
+Server-side session identifiers must be fully invalidated when a user logs out.,Applicable,Implemented
+"Cookie-based session tokens must include the Secure, HttpOnly, and SameSite (lax or strict) attributes.",Applicable,Implemented
+"Stateless session tokens must be protected using digital signatures or encryption (e.g., JWT must be signed with a strong algorithm).",Applicable,Implemented
+Full user re-authentication must be required for sensitive operations such as changing passwords or performing privileged actions.,Applicable,Implemented
+Concurrent active sessions from multiple devices must be restricted or limited for sensitive and administrative accounts.,Applicable,Implemented
+"JWT tokens must be invalidated server-side upon logout, using token blacklisting or short-lived access tokens with refresh token rotation.",Applicable,Implemented
+JWT access token expiry must be set to a short duration of 15 to 60 minutes.,Applicable,Implemented
+"PII such as names, emails, and government IDs must be excluded from JWT token payloads.",Applicable,Implemented
+CSRF tokens and session tokens must not appear in URL parameters.,Applicable,Implemented
+"Active sessions must be invalidated immediately when a user's account is locked, suspended, or deleted.",Applicable,Implemented
+Access Control,,
+All access control logic must be enforced on the server side. Client-side controls alone are not sufficient.,Applicable,Implemented
+"User roles, permissions, and policy data must be protected from manipulation by end users.",Applicable,Implemented
+Users must only be able to access resources they explicitly own or are authorized for.,Not Applicable,-
+Both horizontal privilege escalation (accessing another user's data) and vertical privilege escalation (gaining a higher role) must be prevented.,Applicable,Implemented
+"Anti-CSRF tokens or secure headers must be used for all state-changing requests (POST, PUT, DELETE).",Applicable,Implemented
+Multi-Factor Authentication (MFA) must be enforced on all administrative and sensitive interfaces.,Applicable,Implemented
+Directory browsing must be disabled and sensitive files or metadata must be hidden from public access.,Applicable,Implemented
+"Every request to a restricted or administrative endpoint must be validated against the authenticated user's role and permissions server-side, regardless of the URL path.",Applicable,Implemented
+"Privilege escalation via URL path manipulation or response value tampering (e.g., modifying a role field in a response) must be prevented.",Applicable,Implemented
+All data lookups must be scoped to the authenticated user's ownership. Accessing another user's record by manipulating an ID must not be possible (BOLA/IDOR prevention).,Applicable,Implemented
+Low-privilege users must not be able to invoke administrative or privileged API functions (Broken Function Level Authorization prevention).,Applicable,Implemented
+Access to paid or subscription-based content must be enforced server-side and must not be bypassable through response manipulation.,Not Applicable,-
+"Validation, Sanitization and Encoding",,
+"All input received via GET, POST, cookies, and headers must be validated on the server side before processing.",Applicable,Implemented
+"Input validation must use allow lists, permitting only expected and defined values.",Applicable,Implemented
+Structured inputs such as JSON objects must be validated against a defined schema or strict types before use.,Applicable,Implemented
+Redirects and forwards must be limited to known safe URLs or clearly disclosed to the user to prevent open redirect attacks.,Not Applicable,-
+"Untrusted HTML, SVG, and scriptable content must be sanitized or sandboxed before rendering, including in file uploads.",Not Applicable,-
+Raw or unstructured input from text areas and free-text fields must be cleaned before use in any sensitive context.,Applicable,Implemented
+User input passed into email headers such as subject or from fields must be sanitized to prevent CRLF and header injection.,Applicable,Implemented
+"Dynamic code execution using eval(), new Function(), or equivalent must be avoided unless input is fully controlled and sandboxed.",Applicable,Implemented
+Template engines must be used with proper validation and escaping. User input must never be passed directly into a template expression.,Not Applicable,-
+"External URLs supplied by users must be validated against an allow list before the server makes any outbound request, to prevent SSRF.",Applicable,Implemented
+"Output must be encoded appropriately for its context (HTML, JavaScript, URL) to prevent XSS.",Applicable,Implemented
+Global variables and shared state populated from user input must be sanitized before use. Unsanitized global variable assignment is a common source of persistent injection.,Applicable,Implemented
+Output encoding must preserve character sets and locale to prevent encoding-based bypass attacks.,Not Applicable,-
+"All database queries must use parameterized queries, stored procedures, or a secure ORM. String concatenation in queries is not permitted.",Not Applicable,-
+"JSON, LDAP, and similar structured inputs must be validated properly to prevent injection attacks.",Applicable,Implemented
+File path inputs must be validated and access-controlled to prevent Local File Inclusion and Remote File Inclusion.,Not Applicable,-
+XML and JSON parsers must be configured to disable external entity loading to prevent XXE attacks.,Applicable,Implemented
+Format strings in logs and output must be static and must not be constructed from user input.,Not Applicable,-
+Numeric inputs must be validated to fall within expected ranges to prevent integer overflow and logic issues.,Not Applicable,-
+JSON must be parsed using JSON.parse(). The use of eval() for JSON handling is not permitted.,Applicable,Implemented
+User-controlled input must never be rendered inside template expressions. SSTI must be prevented by design.,Not Applicable,-
+Duplicate parameters in requests must be handled deterministically. Ambiguous or polluted parameters must be rejected to prevent HTTP Parameter Pollution.,Not Applicable,-
+"Deserialization of untrusted data must be avoided. Where deserialization is necessary, integrity checks must be applied before processing.",Applicable,Implemented
+Content loaded into WebViews must be sanitized. JavaScript must be disabled in WebViews where it is not required.,Applicable,Implemented
+"Deep object merge operations that include user-supplied input must use a safe merge library or explicitly strip __proto__, constructor, and prototype keys before merging to prevent prototype pollution attacks.",Not Applicable,-
+User-supplied keys used in property access or object construction must be validated against an allowlist. Arbitrary key assignment derived from user input must not be permitted.,Not Applicable,-
+Stored Cryptography,,
+"All PII must be encrypted at rest using strong, approved encryption.",Applicable,Implemented
+"All sensitive data at rest must be protected using modern, approved encryption methods.",Applicable,Implemented
+"Initialization vectors (IVs), cipher settings, and encryption modes (e.g., AES-GCM) must be configured securely.",Applicable,Implemented
+"Cryptographic settings such as key size, cipher, and algorithm must be designed to support rotation and updates.",Not Applicable,-
+Outdated or insecure algorithms such as MD5 and SHA-1 must not be used except where strictly required for legacy compatibility.,Applicable,Implemented
+"Nonces, IVs, and other one-time values must never be reused with the same key.",Not Applicable,-
+Encrypted data must also be authenticated using HMAC or an AEAD mode such as AES-GCM to ensure integrity.,Applicable,Implemented
+Cryptographic operations must be implemented in constant time to prevent timing-based attacks.,Applicable,Implemented
+"All random values such as tokens, file names, and GUIDs must be generated using a cryptographically secure random number generator.",Applicable,Implemented
+Random number generation must remain secure and high-entropy even under high load or resource constraints.,Not Applicable,-
+"Secrets and keys must be stored using a dedicated secrets manager (e.g., AWS KMS, Azure Key Vault, HashiCorp Vault).",Applicable,Implemented
+"Passwords, API keys, tokens, and secrets must never be hardcoded in source code or configuration files committed to version control.",Applicable,Implemented
+"Cached data must be encrypted to prevent sensitive information from being stored in plaintext in memory, disk, or distributed cache.",Applicable,Implemented
+"Encryption and decryption keys must be stored in a hardware keystore, secure enclave, or secrets manager. Plaintext key storage in config files or source code is not permitted.",Applicable,Implemented
+Error Handling and Logging,,
+"Audit logging must be implemented in admin portals to record key actions such as user creation, deletion, profile updates, and status changes.",Applicable,Implemented
+"Sensitive data such as passwords, payment information, and session tokens must never be written to logs.",Applicable,Implemented
+"Security-relevant events such as login attempts, permission changes, and failed authentications must be logged.",Applicable,Implemented
+"Log entries must include sufficient context such as user ID, timestamp, IP address, and action to support investigations.",Not Applicable,-
+"Authentication events (login success, login failure, MFA attempts) must be logged without exposing sensitive data.",Applicable,Implemented
+All data written to logs must be encoded to prevent log injection via newlines or control characters.,Applicable,Implemented
+Security logs must be stored securely and protected from unauthorized access or tampering.,Not Applicable,-
+"Users must see only a generic error message for unexpected or security-sensitive failures, with an optional reference ID for support.",Applicable,Implemented
+Consistent exception handling must be applied across the codebase to prevent unhandled crashes and information leaks.,Not Applicable,-
+"Debug mode, stack trace output, and verbose error messages must be fully disabled in production environments.",Applicable,Implemented
+"Internal API routes, file paths, and endpoint structures must not be disclosed in page source, JavaScript bundles, or error responses.",Applicable,Implemented
+"PII such as emails, phone numbers, and government IDs must not be written to application or system logs.",Applicable,Implemented
+Audit log endpoints must be access-controlled. Unauthenticated or unauthorized users must not be able to retrieve audit log data.,Applicable,Implemented
+Data Protection,,
+Only the minimum PII necessary for account registration and functionality must be collected.,Applicable,Implemented
+PII displayed in the UI must be masked or partially hidden to reduce the risk of accidental exposure.,Applicable,Implemented
+Users must be able to permanently delete their account and all associated personal data from the system.,Applicable,Implemented
+Explicit user consent must be obtained before storing or using any cookies.,Applicable,Implemented
+A privacy policy page must be implemented and easily accessible within the application.,Not Applicable,-
+Uploaded files must be stored outside the web root with restricted file system permissions.,Not Applicable,-
+The web server must be configured to serve only explicitly allowed file types and extensions.,Applicable,Implemented
+"Sensitive data such as tokens, keys, and PII must be cleared from application memory after use to prevent exposure via memory dumps.",Applicable,Implemented
+Application caches must be cleared on logout so that sensitive data cannot be retrieved from cache after a session ends.,Applicable,Implemented
+Cloud storage resources such as S3 buckets must require authentication. No user-owned content must be publicly accessible without authorization.,Applicable,Implemented
+Swagger and OpenAPI documentation must be restricted from public access in production builds.,Applicable,Implemented
+PII and session data must not appear in URL query parameters. Request body or headers must be used instead.,Applicable,Implemented
+"Sensitive PII fields in the database must be encrypted at the application level, not relying solely on database-level encryption.",Applicable,Implemented
+Communication,,
+TLS must be used for all client connections. Fallback to unencrypted or insecure protocols is not permitted.,Applicable,Implemented
+"TLS configuration must be tested using up-to-date tools (e.g., SSL Labs) to ensure only strong cipher suites are enabled.",Applicable,Implemented
+"Only the latest recommended TLS protocol versions must be enabled (TLS 1.3 preferred, TLS 1.2 as minimum fallback).",Applicable,Implemented
+"All server connections must use valid, trusted TLS certificates. Expired or self-signed certificates must not be used in production.",Applicable,Implemented
+"TLS must be used for all inbound and outbound connections, especially those handling sensitive data.",Applicable,Implemented
+External TLS connections to APIs and databases must be properly authenticated and certificate-validated.,Applicable,Implemented
+Certificate revocation must be handled using OCSP stapling or CRL checking.,Not Applicable,-
+Backend TLS connection failures such as failed handshakes or invalid certificates must be logged for monitoring.,Applicable,Implemented
+Credentials and PII must never be transmitted in cleartext across any endpoint. HTTP form submissions of sensitive data are not permitted.,Applicable,Implemented
+Malicious Code,,
+SonarQube or equivalent SAST tooling must be executed to scan source code for potentially malicious patterns including unsafe file operations and unauthorized network connections.,Applicable,Implemented
+The application source code and all third-party libraries must be free of unauthorized data collection or phone-home capabilities.,Applicable,Implemented
+"The application source code and all third-party libraries must be free of backdoors, hardcoded credentials, undocumented accounts, rootkits, anti-debugging mechanisms, and other hidden or insecure functionality.",Applicable,Implemented
+"Auto-update features must obtain updates only over secure channels, and updates must be digitally signed with signatures validated before installation.",Not Applicable,-
+Known framework vulnerabilities such as Next.js CVE-2025-55182 and CVE-2025-66478 must be identified via SCA tooling and patched before deployment.,Applicable,Implemented
+"Secret scanning must be integrated into the CI/CD pipeline and, where possible, as a pre-commit hook. Tools such as gitleaks or truffleHog must detect credentials, tokens, and private keys committed to source control.",Applicable,Implemented
+"Private package names used internally must be claimed in public registries (npm, PyPI, RubyGems) or use a scoped namespace to prevent dependency confusion substitution attacks.",Applicable,Implemented
+"Dependency lock files (package-lock.json, yarn.lock, poetry.lock, Gemfile.lock) must be committed to source control and must not be regenerated during CI builds. CI pipelines must use the locked install command (e.g., npm ci) rather than a fresh resolve.",Applicable,Implemented
+Business Logic,,
+OTP or MFA must be prompted when a user attempts to update sensitive account details such as email address or phone number.,Applicable,Implemented
+Business logic flows must be processed in their defined sequence. Step skipping must not be possible.,Not Applicable,-
+Actions within business flows must be subject to timing controls that prevent completion at an unrealistically fast pace.,Not Applicable,-
+Limits must be applied to how many times a user can perform sensitive actions such as transactions or API requests within a defined window.,Applicable,Implemented
+"Controls must be in place to detect and block automated abuse, including CAPTCHA and rate limiting on sensitive endpoints.",Not Applicable,-
+Custom validations and limits must be implemented to protect business logic based on known risks identified through threat modelling or past findings.,Not Applicable,-
+Sensitive operations must be protected against race conditions and TOCTOU vulnerabilities.,Not Applicable,-
+Financial transaction amounts and totals must be validated server-side. Client-supplied values must never be trusted for monetary calculations.,Applicable,Implemented
+MPIN and PIN requirements for wallet and financial transactions must be enforced server-side and must not be bypassable through response manipulation.,Applicable,Implemented
+Wallet and financial operations must be scoped strictly to the authenticated account owner. Cross-account transfers must require explicit server-side authorization.,Applicable,Implemented
+OTPs must be single-use only. They must be invalidated immediately upon successful use and rejected if submitted again.,Not Applicable,-
+Payment and card verification flows must be validated entirely server-side to prevent amount tampering or verification bypass.,Not Applicable,-
+Subscription and premium access controls must be enforced server-side and must not be unlockable by modifying a client-side response field.,Not Applicable,-
+Files and Resources,,
+"Uploaded files must be validated for type, size, and content before being accepted by the server.",Applicable,Implemented
+Filenames provided by users must be sanitized or ignored entirely to prevent directory traversal and file overwrite attacks.,Not Applicable,-
+User-supplied input that could be used to load external resources must be validated or ignored to prevent RFI and SSRF.,Not Applicable,-
+Responses serving downloadable files must include the Content-Disposition: attachment header to prevent in-browser execution.,Applicable,Implemented
+User-controlled file metadata such as filenames and paths must never be passed directly to system APIs or shell commands.,Applicable,Implemented
+"Only code from known, trusted sources must be included or executed. Dynamic includes and remote file loading based on user input are not permitted.",Not Applicable,-
+Uploaded files must be stored in directories that are not accessible by the web server and must have restricted permissions.,Applicable,Implemented
+The web tier must be configured to serve only files with explicitly permitted extensions to prevent information leakage.,Not Applicable,-
+Uploaded files must never be served or executed as HTML or JavaScript content when accessed directly in the browser.,Applicable,Implemented
+"Archive files (zip, tar, gz) must be checked for zip bomb attacks before extraction by enforcing a maximum uncompressed size limit and entry count.",Not Applicable,-
+Archive extraction must validate that all extracted file paths resolve within the intended target directory. Paths containing ../ traversal sequences must be rejected before extraction to prevent zip slip attacks.,Not Applicable,-
+API and Web Service,,
+All API endpoints must be secured with both authentication and authorization.,Applicable,Implemented
+API responses must include only the data that the authenticated and authorized user is entitled to view.,Applicable,Implemented
+Message headers and payloads must be validated to ensure they have not been modified in transit.,Applicable,Implemented
+"API response payloads must be trimmed to the minimum data required. Fields such as hashed passwords, internal IDs, or other users' data must not be returned to the client.",Applicable,Implemented
+Hidden or undocumented endpoints must be removed from production JavaScript bundles and page source.,Not Applicable,-
+Server-side outbound HTTP requests must be restricted to an explicit allow list of destinations to prevent Blind SSRF.,Applicable,Implemented
+Deprecated and unused API endpoints must be removed or access-protected in production to minimize the attack surface.,Applicable,Implemented
+GraphQL introspection must be disabled in production environments. Schema discovery must not be available to unauthenticated or unauthorized clients.,Applicable,Implemented
+GraphQL queries must enforce a maximum depth limit to prevent deeply nested queries from exhausting server resources.,Applicable,Implemented
+GraphQL query complexity and cost must be calculated and limited per request. Alias-based batching attacks must be rate-limited or disallowed.,Applicable,Implemented
+"Incoming webhook payloads must be authenticated by validating an HMAC signature (e.g., X-Hub-Signature-256) using a shared secret before processing the request.",Applicable,Implemented
+"Webhook endpoints must prevent replay attacks by rejecting payloads with a timestamp outside a defined window (e.g., +/- 5 minutes) or by recording and checking nonces.",Not Applicable,-
+API endpoints must only accept and process explicitly allowlisted fields from request bodies. User-supplied JSON must not be deserialized directly into model objects without strict field filtering to prevent mass assignment.,Applicable,Implemented
+"Every API endpoint that accesses a resource by ID must verify that the specific object belongs to (or is explicitly shared with) the requesting user. Authorization must be re-evaluated per resource on every request, not assumed from login state alone.",Applicable,Implemented
+"REST API endpoints must enforce rate limits per authenticated user and per IP address, returning 429 Too Many Requests with Retry-After and X-RateLimit headers when limits are exceeded.",Applicable,Implemented
+"Collection endpoints that return lists of resources must enforce a maximum page size. Requests with a limit or page_size parameter exceeding the maximum must be capped server-side, not fulfilled in full.",Not Applicable,-
+API endpoints must validate the Content-Type header on incoming requests. Requests with an unexpected or missing content type must be rejected with 415 Unsupported Media Type before the body is parsed or processed.,Applicable,Implemented
+"When an API version or endpoint is deprecated but not yet removed, it must return Sunset and Deprecation response headers so consumers can identify and migrate away before removal.",Applicable,Implemented
+"When the application consumes third-party or internal service APIs, responses must be validated against an expected schema before the data is used, stored, or rendered. Data from external APIs must not be trusted as safe or correctly formed.",Applicable,Implemented
+API endpoints must ignore X-HTTP-Method-Override headers and _method query parameters unless the application explicitly requires them. These must not be used to tunnel non-permitted HTTP methods through POST requests.,Applicable,Implemented
+Configuration,,
+The application stack must be deployable using infrastructure-as-code or CI/CD pipelines.,Not Applicable,-
+Outdated libraries and dependencies must be detected using a software composition analysis tool.,Not Applicable,-
+"Unnecessary features, sample applications, and default files (e.g., /examples/, /docs/, /test/) must be removed from the web root.",Not Applicable,-
+Subresource Integrity (SRI) must be applied to all externally loaded scripts and stylesheets to protect against CDN compromise.,Not Applicable,-
+A Software Bill of Materials (SBOM) must be available or generated for each release.,Not Applicable,-
+HTTP headers and error pages must not expose version information such as Apache/2.4.49 or X-Powered-By: PHP.,Applicable,Implemented
+All text-based responses must include a valid Content-Type header with appropriate character encoding.,Applicable,Implemented
+A Content Security Policy (CSP) must be implemented.,Not Applicable,-
+The X-Content-Type-Options: nosniff header must be present on all responses.,Applicable,Implemented
+Strict-Transport-Security (HSTS) must be enabled with includeSubDomains and a secure max-age value.,Not Applicable,-
+"The Referrer-Policy header must be configured to limit referrer leakage (e.g., strict-origin or no-referrer).",Applicable,Implemented
+Clickjacking protection must be implemented using X-Frame-Options or the frame-ancestors directive in CSP.,Not Applicable,-
+"The server must reject unexpected HTTP methods such as TRACE, PUT, and DELETE where they are not required.",Applicable,Implemented
+The Origin header must be treated as informational only and must not be used to make access control decisions.,Applicable,Implemented
+"CORS must be configured to allow only trusted, explicitly listed origins. Wildcard and null values are not permitted.",Applicable,Implemented
+The Content Security Policy must avoid unsafe-inline and unsafe-eval directives where possible. Nonce or hash-based CSP must be used instead.,Applicable,Implemented
+WordPress-specific default endpoints such as xmlrpc.php and wp-login.php must be disabled or protected from unauthenticated access.,Applicable,Implemented
+"Configuration and installation files such as .env, config.php, web.config, and composer.json must not be accessible from the web root in production.",Applicable,Implemented
+"Deactivated or unused plugins, themes, and components must be fully removed from the application, not merely disabled.",Not Applicable,-
+WordPress debug logging must be disabled in production. WP_DEBUG and WP_DEBUG_LOG must be set to false.,Applicable,Implemented
+"Deprecated HTTP response headers such as X-XSS-Protection, Expect-CT, and X-Powered-By must be removed from all responses.",Applicable,Implemented
+Docker containers must run as a non-root user. The USER directive in the Dockerfile must specify a non-privileged user. Containers must not be run with --privileged or --cap-add beyond what is strictly required.,Applicable,Implemented
+"Container images must be scanned for known CVEs before deployment using a container scanning tool (e.g., Trivy, Snyk Container, AWS ECR image scanning). Images with critical or high-severity vulnerabilities must not be promoted to production.",Applicable,Implemented
+"Secrets, credentials, and .env files must not be baked into Docker image layers. Build-time secrets must use --secret mount or multi-stage build patterns. Runtime secrets must be injected via a secrets manager or environment injection at runtime, not embedded in the image.",Applicable,Implemented
+Compliance / Data Privacy,,
+Users must be able to request access to all personal data held about them.,Applicable,Implemented
+Users must be able to request correction of inaccurate personal data.,Applicable,Implemented
+Users must be able to request permanent deletion of their personal data (right to be forgotten).,Applicable,Implemented
+Users must be able to object to specific uses of their personal data such as marketing.,Applicable,Implemented
+User data requests must be fulfilled within one month as required by GDPR.,Applicable,Implemented
+Explicit user consent must be obtained and recorded before collecting or processing any personal data.,Applicable,Implemented
+The signup and signin pages must provide users access to the privacy policy and terms and conditions.,Applicable,Implemented
+The privacy policy must be kept up to date and users must be notified of any changes.,Not Applicable,-
+All third-party SDKs and services must be covered by Data Processing Agreements (DPAs).,Applicable,Implemented
+Only the minimum personal data required for app functionality must be collected.,Applicable,Implemented
+Collected data must be used only for the purposes disclosed at the time of collection.,Applicable,Implemented
+"A cookie consent banner must be implemented allowing users to accept or reject non-essential cookies by category (analytics, marketing, essential) before any tracking cookies are set. (GDPR)",,
+"Explicit, affirmative consent must be collected and recorded with a timestamp and consent version before personal data is processed. Pre-ticked boxes are not permitted. (GDPR)",,
+"A data portability feature must be implemented, allowing users to export their personal data in a structured, machine-readable format such as JSON or CSV. (GDPR)",,
+"A consent withdrawal mechanism must be implemented. Users must be able to revoke consent at any time, and data processing must stop immediately upon withdrawal. (GDPR)",,
+Each personal data field collected must be limited to what is strictly necessary for the stated purpose. (GDPR),,
+Personal data must be automatically deleted or anonymised after the retention period specified in the privacy policy has elapsed. (GDPR),,
+Users under the age of 16 must not be permitted to register without verifiable parental consent. (GDPR),,
+"Separate consent must be collected for profiling and automated decision-making, with an opt-out option available. (GDPR)",,
+"A privacy notice must be displayed at each point of data collection, stating the purpose, lawful basis, and retention period. (GDPR)",,
+Breach detection events such as unauthorised access and bulk data exports must be logged with sufficient detail to support a 72-hour notification to the supervisory authority. (GDPR),,
+No data must be sent to a third-party SDK before user consent has been obtained and recorded. (GDPR),,
+"A clear, plain-language consent notice must be displayed before personal data is collected, stating the exact purpose for which it will be used. (India DPDPA)",,
+A consent withdrawal feature must be implemented. Users must be able to withdraw consent at any time and data processing must cease immediately. (India DPDPA),,
+Personal data processing must be strictly limited to the purposes stated in the consent notice. Secondary use without fresh consent is not permitted. (India DPDPA),,
+A feature must be implemented allowing users to view a summary of their personal data currently held and processed by the application. (India DPDPA),,
+"A nomination feature must be implemented, allowing users to designate another individual to exercise their data rights on their behalf. (India DPDPA)",,
+"A grievance submission mechanism must be implemented in the application, such as an in-app form or a clearly visible contact point for data-related complaints. (India DPDPA)",,
+"Age verification must be implemented to identify users under 18, and verifiable parental or guardian consent must be collected before processing their data. (India DPDPA)",,
+"Behavioural profiling, tracking, and targeted advertising of users under 18 must be blocked at the application level. (India DPDPA)",,
+Cross-border data transfers must be implemented only to countries approved by the Central Government. Transfers to non-approved destinations must be blocked. (India DPDPA),,
+Internal personal data breach events must be logged so that the relevant authority can be notified within the prescribed timeline. (India DPDPA),,
+"A privacy notice must be displayed to users at the time of data collection, stating the purpose, categories of data collected, and their rights. (Jamaica DPA)",,
+Personal data collection must be strictly limited to the purposes disclosed. Fields beyond what is needed for the stated function must not be collected. (Jamaica DPA),,
+Personal data must be retained only for the period required for its purpose and must be automatically deleted or anonymised afterwards. (Jamaica DPA),,
+An opt-out mechanism for direct marketing must be implemented. Users must be able to unsubscribe from marketing communications both in-app and via email. (Jamaica DPA),,
+"Special personal information such as health, financial, and biometric data must be stored with additional encryption and access controls beyond standard PII. (Jamaica DPA)",,
+Cross-border data transfers must be restricted to jurisdictions with equivalent data protection standards unless explicit user consent has been obtained. (Jamaica DPA),,
+Personal data accuracy must be maintained. Stale or incorrect records must be flagged and updatable by the data subject. (Jamaica DPA),,
+"Personal data must be collected only for a specific, explicitly stated, and lawful purpose. Unnecessary or undisclosed fields must not be collected. (POPIA)",,
+The volume of personal data collected must be minimised to only what is adequate and relevant for the stated purpose. (POPIA),,
+"An objection mechanism must be implemented, allowing Data Subjects to object to the processing of their personal information. (POPIA)",,
+"Special personal information such as health, biometric, criminal, political, and religious data must be stored with additional encryption and access controls, and must be processed only with explicit consent. (POPIA)",,
+Cross-border transfers of personal information must include appropriate technical safeguards in the implementation. Transfers to countries without equivalent protection must be blocked unless the data subject has explicitly consented. (POPIA),,
+"Internal breach detection events such as unauthorised access, bulk exports, and integrity check failures must be logged to support timely notification of the Information Regulator and affected Data Subjects. (POPIA)",,
+"Reasonable technical security measures must be implemented to protect personal information against loss, unauthorised access, and disclosure. (POPIA)",,
+SOC 2 Type II (Trust Service Criteria),,
+"Comprehensive audit logging must be implemented for all security-relevant actions including login, logout, data access, privilege changes, and admin actions. Each log entry must include user ID, timestamp, IP address, and a description of the action.",Applicable,Implemented
+Access controls must enforce least privilege. Each role must have access only to the resources required for its function.,Applicable,Implemented
+Multi-factor authentication must be enforced for access to all administrative interfaces and privileged functions.,Applicable,Implemented
+"Automatic session timeout must be implemented at a maximum of 30 minutes of inactivity, with server-side session invalidation on logout.",Applicable,Implemented
+"All data must be encrypted at rest using AES-256 or equivalent, and in transit using TLS 1.2 or higher.",Applicable,Implemented
+Input validation and output encoding must be applied to all user-supplied data to prevent injection and XSS vulnerabilities.,Applicable,Implemented
+"Error handling must be implemented so that stack traces, internal file paths, and system details are never returned to the end user.",Applicable,Implemented
+System health and availability monitoring endpoints such as /health or /status must be implemented and must not expose sensitive system information.,Not Applicable,-
+A data export or restore mechanism must be implemented at the application level for critical data to support recovery requirements.,Applicable,Implemented
+Software dependencies must be scanned for known vulnerabilities as part of the build pipeline. Builds with critical CVEs must not proceed to deployment.,Applicable,Implemented
+Separation of duties must be enforced in code. Users must not be able to approve their own requests or unilaterally deploy their own code changes to production.,Not Applicable,-
+ISO/IEC 27001:2022 (Information Security Management),,
+"All secrets including API keys, database credentials, and tokens must be managed via a secrets manager or environment variables. Hardcoding secrets in source code is not permitted. (Annex A 8.10)",,
+"Only approved cryptographic algorithms and key lengths must be used such as AES-256, RSA-2048 or higher, and SHA-256 or higher. MD5, SHA-1, and DES are not permitted. (Annex A 8.24)",,
+Access logging and a tamper-evident audit trail must be implemented for all sensitive operations and data access events. (Annex A 8.15),,
+"Secure-by-default configuration must be applied. Default credentials must be changed, debug mode must be disabled, and service accounts must follow least privilege. (Annex A 8.9)",,
+Software composition analysis must be integrated into the CI/CD pipeline. Deployment of components with known critical vulnerabilities must be blocked. (Annex A 8.8),,
+"API responses must be filtered to prevent leakage of sensitive internal data fields. Internal IDs, password hashes, and other users' data must not be returned unnecessarily. (Annex A 8.12)",,
+Security testing including SAST and DAST must be integrated into the CI/CD pipeline. Builds with high or critical findings must be blocked from deployment. (Annex A 8.29),,
+"All web inputs must be validated and sanitised server-side before processing, logging, or storing, to prevent injection, XSS, and path traversal. (Annex A 8.28)",,
+The application must be free of insecure direct object references. All resource identifiers must be opaque and access must be verified against the authenticated user for every request. (Annex A 8.3),,
+Third-party libraries and frameworks must be kept up to date. Security patches must be applied within a defined SLA based on severity. (Annex A 8.8),,
+"Sensitive data must be handled according to its classification. Confidential data must be encrypted, access-controlled, and excluded from non-essential API responses. (Annex A 5.12)",,
+"A secure software development lifecycle must be followed. Threat modelling, peer code review, and security testing must be performed before each release. (Annex A 8.25 to 8.31)",,

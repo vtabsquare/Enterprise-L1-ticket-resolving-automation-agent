@@ -80,6 +80,77 @@ class ToolExecutionAgent:
                     user_principal_name=params.get("user_email", ""),
                     list_email=params.get("list_email", "")
                 )
+            elif action_plan.action_type == "generate_initial_password":
+                import secrets
+                import string
+                alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+                temp_pw = "".join(secrets.choice(alphabet) for i in range(16))
+                
+                user_email = params.get("user_email", "")
+                graph.reset_password(
+                    user_principal_name=user_email,
+                    temporary_password=temp_pw
+                )
+                
+                ticket_row = retry_once(
+                    lambda: supabase_service.get_ticket_by_id(ticket_id),
+                    agent="ToolExecutionAgent", ticket_id=ticket_id, call="Supabase get_ticket_by_id",
+                )
+                reporter_email = (ticket_row or {}).get("reporter_email") if ticket_row else None
+                settings = get_settings()
+                
+                recipient = params.get("to") or reporter_email or settings.test_notification_email
+                if not recipient:
+                    raise ValueError("generate_initial_password: no recipient available to send email")
+                    
+                email_subject = f"Initial Password for {user_email}"
+                email_body = (
+                    f"An initial password has been generated for {user_email}.\n\n"
+                    f"Temporary Password: {temp_pw}\n\n"
+                    f"The user will be forced to change this password on their next sign-in."
+                )
+                email_sent = graph.send_email(
+                    to=recipient,
+                    subject=_sanitize_text(email_subject),
+                    body=_sanitize_text(email_body),
+                )
+                return {
+                    "user_email": user_email,
+                    "password_reset": True,
+                    "email_sent": email_sent,
+                }
+            elif action_plan.action_type == "check_app_access":
+                user_email = params.get("user_email", "")
+                app_name = params.get("app_name", "")
+                has_access = graph.check_app_role_assignment(
+                    user_principal_name=user_email,
+                    app_name_or_id=app_name,
+                )
+                if not has_access:
+                    raise RuntimeError(f"User {user_email} does NOT have access to {app_name}. Escalating for provisioning.")
+                
+                return {
+                    "has_access": has_access,
+                    "user_email": user_email,
+                    "app": app_name,
+                    "answer": f"Confirmed: {user_email} has access to {app_name}."
+                }
+            elif action_plan.action_type == "check_license":
+                user_email = params.get("user_email", "")
+                software = params.get("software", "")
+                has_license = graph.check_license(
+                    user_principal_name=user_email,
+                    requested_software=software,
+                )
+                if not has_license:
+                    raise RuntimeError(f"User {user_email} does NOT have a license for {software}. Escalating for provisioning.")
+                    
+                return {
+                    "has_license": has_license,
+                    "user_email": user_email,
+                    "software": software,
+                    "answer": f"Confirmed: {user_email} has a license for {software}."
+                }
             elif action_plan.action_type == "check_group_membership":
                 user_email = params.get("user_email", "")
                 group_name_or_id = params.get("group_id", params.get("group", "UnknownGroup"))
@@ -88,8 +159,10 @@ class ToolExecutionAgent:
                     group_name_or_id=group_name_or_id,
                 )
 
-                membership_status = "is" if is_member else "is NOT"
-                answer = f"{'Yes' if is_member else 'No'}, {user_email} {membership_status} a member of {group_name_or_id}."
+                if not is_member:
+                    raise RuntimeError(f"User {user_email} is NOT a member of {group_name_or_id}. Escalating for provisioning.")
+
+                answer = f"Confirmed: {user_email} is a member of {group_name_or_id}."
 
                 ticket_row = retry_once(
                     lambda: supabase_service.get_ticket_by_id(ticket_id),

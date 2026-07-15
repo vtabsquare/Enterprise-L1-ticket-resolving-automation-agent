@@ -29,9 +29,10 @@ Before deploying to production TWO changes are required together — neither alo
 import structlog
 from typing import Optional
 from datetime import datetime
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
+from supabase import Client
+from app.dependencies.auth import verify_supabase_token
 
-from app.services.supabase_service import get_supabase_client
 
 log = structlog.get_logger(__name__)
 router = APIRouter()
@@ -43,8 +44,7 @@ async def dashboard_tickets(
     category: Optional[str] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100)
-):
-    client = get_supabase_client()
+, client: Client = Depends(verify_supabase_token)):
     query = client.table("tickets").select("*", count="exact")
     
     if status:
@@ -66,8 +66,7 @@ async def dashboard_tickets(
 
 
 @router.get("/tickets/{ticket_id}", summary="Dashboard: ticket detail")
-async def dashboard_ticket_detail(ticket_id: str):
-    client = get_supabase_client()
+async def dashboard_ticket_detail(ticket_id: str, client: Client = Depends(verify_supabase_token)):
     
     # 1. Fetch ticket
     t_res = client.table("tickets").select("*").eq("id", ticket_id).execute()
@@ -116,8 +115,7 @@ async def dashboard_audit(
     ticket_id: Optional[str] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100)
-):
-    client = get_supabase_client()
+, client: Client = Depends(verify_supabase_token)):
     query = client.table("audit_logs").select("*", count="exact")
     
     if ticket_id:
@@ -141,8 +139,7 @@ async def dashboard_audit(
 async def dashboard_escalations(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100)
-):
-    client = get_supabase_client()
+, client: Client = Depends(verify_supabase_token)):
     # Join with tickets if foreign key exists, otherwise just get escalations
     query = client.table("escalations").select("*, tickets(summary, status)", count="exact")
     
@@ -161,8 +158,7 @@ async def dashboard_escalations(
 
 
 @router.get("/stats", summary="Dashboard: KPI stats")
-async def dashboard_stats():
-    client = get_supabase_client()
+async def dashboard_stats(client: Client = Depends(verify_supabase_token)):
     
     # Fix: Fetch all and filter in Python to avoid Cloudflare 500s from unencoded '%' in the URL
     res = client.table("tickets").select("id, status, external_id, created_at").execute()
@@ -203,9 +199,9 @@ async def dashboard_stats():
 @router.get("/policy-decisions", summary="Dashboard: recent policy decisions")
 async def dashboard_policy_decisions(
     page: int = Query(1, ge=1),
-    page_size: int = Query(25, ge=1, le=100)
+    page_size: int = Query(25, ge=1, le=100),
+    client: Client = Depends(verify_supabase_token)
 ):
-    client = get_supabase_client()
     query = client.table("audit_logs").select("*", count="exact").eq("event_type", "policy_checked")
     
     start_idx = (page - 1) * page_size

@@ -22,9 +22,13 @@ const api = axios.create({
   },
 })
 
+import { supabase } from '../lib/supabase'
+
 // ── Request interceptor — attach auth token if present ────────────────────────
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('l1_admin_token')
+api.interceptors.request.use(async (config) => {
+  const { data } = await supabase.auth.getSession()
+  const token = data?.session?.access_token
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }

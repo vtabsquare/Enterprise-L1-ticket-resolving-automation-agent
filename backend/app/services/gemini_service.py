@@ -32,10 +32,11 @@ Choose the most SPECIFIC matching category — do not fall back to a generic buc
 CATEGORIES AND EXAMPLES:
 
 # Account / Password
-- first_time_password_setup → "First time logging in, need my password", "How do I set up my new employee password?", "Just joined, need to generate my initial password"
+- first_time_password_generation → "First time logging in, need my password", "How do I set up my new employee password?", "Just joined, need to generate my initial password"
 - password_reset          → "I forgot my Windows password", "My domain password expired and I'm locked out", "Reset my AD credentials"
 - account_unlock          → "My account is locked after too many failed attempts", "AD account locked, please unlock", "Locked out of domain login"
 - password_expiry_assistance → "My password is about to expire, how do I change it?", "Got a warning that password expires in 5 days", "How do I update my password before it expires?"
+- password_policy_info    → "What are the password complexity requirements?", "How many characters does my password need to be?", "Password requirements"
 
 # VPN
 - vpn_connectivity_issue  → "VPN keeps disconnecting", "VPN connects but I can't reach internal resources", "VPN is slow and dropping"
@@ -43,21 +44,27 @@ CATEGORIES AND EXAMPLES:
 - vpn_account_unlock      → "VPN account is locked after failed attempts", "Locked out of Cisco AnyConnect", "VPN authentication failing, account locked"
 - vpn_access_request      → "New contractor needs VPN access", "Please provision VPN for my team member", "Request VPN access for new hire"
 - vpn_configuration_guide → "How do I set up the VPN for the first time?", "Need instructions to configure VPN on my new laptop", "What is the VPN portal address?"
+- vpn_connection_howto    → "How do I actually connect to the VPN?", "Steps to connect to the corporate VPN", "I have the VPN installed but don't know how to turn it on"
 - vpn_profile_reset       → "VPN profile is corrupted", "Need to reinstall VPN client profile", "VPN config stuck, how do I reset it?"
 
 # Active Directory / Identity
 - temporary_account_activation → "Activate temporary contractor account", "Grant temporary access for auditor", "Need 2-week temp account activated"
 - user_enable_disable     → "Please disable the account of departing employee", "Enable account for returning employee", "Deactivate AD account for John Smith"
 - group_membership_validation → "Check if user is in the correct security group", "Validate group membership for audit", "Is user in the VPN Users group?"
+- permission_validation   → "Do I have access to the Marketing group?", "Check my permissions for the finance folder", "Verify my group membership"
 
 # Software Access / Licensing
 - software_access         → "Need access to Salesforce", "Request Adobe license", "Can't log into the CRM system"
 - software_install_request → "Please install Visual Studio on my laptop", "Need AutoCAD installed", "Can you push the Zoom client to my machine?"
+- teams_troubleshooting   → "Teams is crashing", "Clear Microsoft Teams cache", "Teams won't sync my messages"
+- software_license_validation → "Do I have an Office 365 license?", "Check if I have Visio assigned", "Verify my E5 license"
+- application_access_verification → "Check if I have access to Jira", "Verify I have the Adobe role assigned", "Do I have access to Salesforce?"
 
 # Email / Mailbox
 - email_issue             → "Can't send or receive emails", "Outlook keeps crashing", "Email stuck in outbox"
 - mailbox_access_issue    → "Can't access shared mailbox", "Missing permissions on HR mailbox", "Shared inbox not showing in Outlook"
 - outlook_profile_reset   → "Outlook profile is corrupted, need to recreate it", "Outlook keeps asking for password after profile issue", "Need to reset my Outlook profile"
+- outlook_configuration_guide → "How do I configure Outlook?", "Set up email profile", "First time Outlook setup"
 - distribution_list_update → "Add new member to the finance DL", "Remove ex-employee from mailing list", "Update distribution group membership"
 - mail_forwarding_request → "Set up mail forwarding for departing employee", "Forward emails from old account to new", "Auto-forward my emails while on leave"
 - shared_folder_access    → "Need access to the shared drive folder", "Can't open shared network folder", "Request permissions on SharePoint folder"
@@ -69,6 +76,7 @@ CATEGORIES AND EXAMPLES:
 # Network
 - network_connectivity    → "No internet connection", "Network is down in Building 3", "Can't connect to WiFi"
 - network_adapter_issue   → "Network adapter shows as disabled", "Ethernet adapter not detected", "WiFi adapter missing from Device Manager"
+- ip_renewal_guidance     → "How do I renew my IP?", "Release and renew IP address", "Getting IP conflict, need to renew DHCP"
 - dns_flush_guidance      → "Getting DNS errors", "Site not resolving, how do I flush DNS?", "DNS cache issue, need guidance"
 
 # Onboarding / Offboarding
@@ -112,8 +120,8 @@ higher-risk action (e.g. "reset my password now", "unlock immediately").
 CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
 
 # Account / Password
-- first_time_password_setup    → proposed_action: send_email
-                                  (KB guidance: explain how to set up password for the first time)
+- first_time_password_generation → proposed_action: generate_initial_password
+                                  (generates and emails a temporary password for new users)
 - password_reset               → proposed_action: password_reset
                                   (only when user says "reset now" / "reset immediately")
 - password_expiry_assistance   → proposed_action: send_email
@@ -121,6 +129,8 @@ CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
                                   EXCEPTION: if ticket says "reset it for me now" → password_reset
 - account_unlock               → proposed_action: ad_unlock
                                   (always — no ambiguity, safe auto-action)
+- password_policy_info         → proposed_action: send_email
+                                  (KB guidance: corporate password complexity rules)
 
 # VPN
 - vpn_connectivity_issue       → proposed_action: send_email
@@ -135,6 +145,8 @@ CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
                                   (provision user into VPN security group)
 - vpn_configuration_guide      → proposed_action: send_email
                                   (KB steps to set up the VPN client for the first time)
+- vpn_connection_howto         → proposed_action: send_email
+                                  (KB steps on how to initiate a VPN connection)
 - vpn_profile_reset            → proposed_action: send_email
                                   (KB steps to delete and reinstall VPN client profile)
 
@@ -145,12 +157,20 @@ CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
                                   (high-risk write action — always requires human approval)
 - group_membership_validation  → proposed_action: check_group_membership
                                   (calls Graph API to verify membership, sends confirmation if true)
+- permission_validation        → proposed_action: check_group_membership
+                                  (calls Graph API to verify membership, sends confirmation if true)
 
 # Software Access / Licensing
 - software_access              → proposed_action: group_add
                                   (provision group membership for the application)
 - software_install_request     → proposed_action: escalate
                                   (no endpoint agent — always route to Desktop Support)
+- teams_troubleshooting        → proposed_action: send_email
+                                  (KB steps to clear Teams cache and restart)
+- application_access_verification → proposed_action: check_app_access
+                                  (calls Graph API to verify enterprise application role assignments)
+- software_license_validation  → proposed_action: check_license
+                                  (calls Graph API to verify M365/software license assignments)
 
 # Email / Mailbox
 - email_issue                  → proposed_action: send_email
@@ -159,6 +179,8 @@ CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
                                   (KB steps to request shared mailbox permissions)
 - outlook_profile_reset        → proposed_action: send_email
                                   (KB steps to delete and recreate Outlook profile)
+- outlook_configuration_guide  → proposed_action: send_email
+                                  (KB steps to configure an Outlook profile)
 - distribution_list_update     → proposed_action: dl_update
                                   (adds a user to a DL by email address or display name)
 - mail_forwarding_request      → proposed_action: escalate
@@ -178,6 +200,8 @@ CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
                                   EXCEPTION: if the ticket reports a severe/site-wide outage → escalate
 - network_adapter_issue        → proposed_action: send_email
                                   (KB steps to re-enable adapter via Device Manager)
+- ip_renewal_guidance          → proposed_action: send_email
+                                  (KB steps to release and renew IP address)
 - dns_flush_guidance           → proposed_action: send_email
                                   (KB steps for ipconfig /flushdns and DNS troubleshooting)
 
@@ -197,12 +221,14 @@ CATEGORY-TO-ACTION MAPPING (use these as your defaults — do not deviate):
 Output ONLY valid JSON in the following format, with no markdown formatting or extra text:
 {{
     "reasoning": "Explain step-by-step why you chose this plan, referencing the KB articles, ticket wording, and the category-to-action mapping above.",
-    "proposed_action": "MUST be exactly one of: 'password_reset', 'ad_unlock', 'group_add', 'send_email', 'escalate', 'dl_update', 'check_group_membership'",
+    "proposed_action": "MUST be exactly one of: 'generate_initial_password', 'password_reset', 'ad_unlock', 'group_add', 'send_email', 'escalate', 'dl_update', 'check_group_membership', 'check_app_access', 'check_license'",
     "target_system": "The specific system this action applies to. Use 'ad' for AD actions, 'graph' for send_email, 'jira' or 'servicenow' for ITSM actions.",
     "action_payload": {{
         "user_email": "the reporter's email address if identifiable from the ticket text, otherwise leave as empty string",
         "group_id": "for check_group_membership or group_add: the group id to check or add against",
         "list_email": "for dl_update: the email or best guess name of the distribution list from the ticket text",
+        "app_name": "for check_app_access: the name of the application being requested",
+        "software": "for check_license: the name of the software license being requested",
         "subject": "for send_email: a concise, helpful subject line for the guidance email",
         "body": "for send_email: the full guidance text to send to the user, drawn from the matched KB articles"
     }},

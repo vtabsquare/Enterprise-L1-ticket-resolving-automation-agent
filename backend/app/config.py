@@ -36,6 +36,9 @@ _REQUIRED_VARS: list[tuple[str, str]] = [
     ("MS_CLIENT_SECRET",           "Microsoft Azure app client secret"),
 ]
 
+# Note: JIRA_WEBHOOK_SECRET is optional to avoid breaking local dev.
+
+
 def _validate_required_vars() -> None:
     """
     Called once at startup. Prints ALL missing variables at once
@@ -104,8 +107,8 @@ class Settings:
         self.jira_base_url: str          = os.environ["JIRA_BASE_URL"]
         self.jira_email: str             = os.environ["JIRA_EMAIL"]
         self.jira_api_token: str         = os.environ["JIRA_API_TOKEN"]
-        self.jira_project_key: str       = os.environ.get("JIRA_PROJECT_KEY", "KAN")
         self.jira_webhook_secret: str    = os.environ.get("JIRA_WEBHOOK_SECRET", "")
+        self.jira_project_key: str       = os.environ.get("JIRA_PROJECT_KEY", "KAN")
 
         # ── ServiceNow ────────────────────────────────────────────────────────
         self.servicenow_mode: str            = os.environ.get("SERVICENOW_MODE", "mock")
