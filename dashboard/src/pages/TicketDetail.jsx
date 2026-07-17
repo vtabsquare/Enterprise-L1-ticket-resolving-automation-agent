@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { fetchTicketDetail } from '../api/dashboardApi'
 import { format } from 'date-fns'
 import { ArrowLeft } from 'lucide-react'
+import AiProcessingTracker from '../components/AiProcessingTracker'
 
 export default function TicketDetail() {
   const { id } = useParams()
@@ -39,6 +40,8 @@ export default function TicketDetail() {
         <h1 className="page-title">{ticket.external_id}: {ticket.summary}</h1>
         <p className="page-subtitle">Source: {ticket.source} | Status: <span className="badge">{ticket.status}</span></p>
       </div>
+
+      <AiProcessingTracker status={ticket.status} timeline={timeline} />
 
       <div style={{ backgroundColor: 'var(--surface-color)', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
         <h3>Description</h3>

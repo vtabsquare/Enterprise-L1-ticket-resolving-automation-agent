@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink, Navigate, Outlet } from 'react-r
 import { LayoutDashboard, Ticket, ShieldCheck, ScrollText, AlertTriangle, BarChart3, LogOut } from 'lucide-react'
 
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { NotificationProvider } from './contexts/NotificationContext'
 import Login from './pages/Login'
 
 import TicketFeed       from './pages/TicketFeed.jsx'
@@ -70,19 +71,21 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          {/* Protected Routes wrapped in Layout */}
-          <Route element={<ProtectedLayout />}>
-            <Route path="/"                 element={<Stats />}           />
-            <Route path="/tickets"          element={<TicketFeed />}      />
-            <Route path="/tickets/:id"      element={<TicketDetail />}    />
-            <Route path="/policy-decisions" element={<PolicyDecisions />} />
-            <Route path="/audit"            element={<AuditLogViewer />}  />
-            <Route path="/escalations"      element={<Escalations />}     />
-          </Route>
-        </Routes>
+        <NotificationProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            
+            {/* Protected Routes wrapped in Layout */}
+            <Route element={<ProtectedLayout />}>
+              <Route path="/"                 element={<Stats />}           />
+              <Route path="/tickets"          element={<TicketFeed />}      />
+              <Route path="/tickets/:id"      element={<TicketDetail />}    />
+              <Route path="/policy-decisions" element={<PolicyDecisions />} />
+              <Route path="/audit"            element={<AuditLogViewer />}  />
+              <Route path="/escalations"      element={<Escalations />}     />
+            </Route>
+          </Routes>
+        </NotificationProvider>
       </BrowserRouter>
     </AuthProvider>
   )
