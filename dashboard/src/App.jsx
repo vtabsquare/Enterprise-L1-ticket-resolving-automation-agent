@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route, NavLink, Navigate, Outlet } from 'react-router-dom'
+import { HashRouter, Routes, Route, NavLink, Navigate, Outlet } from 'react-router-dom'
 import { LayoutDashboard, Ticket, ShieldCheck, ScrollText, AlertTriangle, BarChart3, LogOut } from 'lucide-react'
 
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -70,7 +70,7 @@ const ProtectedLayout = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter>
         <NotificationProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -86,7 +86,7 @@ export default function App() {
             </Route>
           </Routes>
         </NotificationProvider>
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   )
 }
