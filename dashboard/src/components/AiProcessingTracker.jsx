@@ -43,9 +43,18 @@ export default function AiProcessingTracker({ status, timeline = [] }) {
 
   return (
     <div className="ai-tracker-container">
+      <div className="ai-bg-grid"></div>
       <div className="ai-tracker-header">
         <div className="pulse-dot"></div>
-        <h3>AI Processor Active</h3>
+        <div className="header-text-group">
+          <h3>[ // NEURAL CORE ENGAGED ]</h3>
+          <span className="header-sub">SYSTEM LINK ESTABLISHED • REAL-TIME SYNC</span>
+        </div>
+        <div className="header-stats">
+          <span>MEM: 0x44F</span>
+          <span>CPU: 12%</span>
+          <span>NET: SECURE</span>
+        </div>
       </div>
       
       <div className="ai-steps-container">
@@ -72,9 +81,10 @@ export default function AiProcessingTracker({ status, timeline = [] }) {
       </div>
 
       <div className="terminal-window">
+        <div className="scanline"></div>
         <div className="terminal-header">
           <span></span><span></span><span></span>
-          <div className="terminal-title">system_log.sh</div>
+          <div className="terminal-title">system_log.sh [AUTH: ROOT]</div>
         </div>
         <div className="terminal-body typewriter">
           {terminalOutput}
