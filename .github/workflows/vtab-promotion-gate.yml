@@ -1,0 +1,29 @@
+name: VTAB Promotion Gate
+
+on:
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-promotion-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require develop as promotion source
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          if [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "::error::Production promotion PRs must originate from the develop branch."
+            exit 1
+          fi
+          echo "Promotion source validated: develop -> ${{ github.base_ref }}"
+
+      - name: Record immutable promotion candidate
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Commit: ${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "Production changes require PR review/approval before merge."
