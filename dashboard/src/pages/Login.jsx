@@ -89,6 +89,7 @@ const Login = () => {
                 
                 <div className="login-footer">
                     <p>Secured by Supabase Authentication</p>
+                    <a href="https://www.vtabsquare.com/?demo=1&product=enterprise-l1-ticket-automation&source=l1-ticket-agent-demo" target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 12, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 4, color: 'inherit' }}>Contact for Demo ↗</a>
                 </div>
             </div>
             
